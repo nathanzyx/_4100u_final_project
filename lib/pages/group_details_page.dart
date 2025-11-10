@@ -38,13 +38,13 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   }
 
   /// Toggles joined/left state for this group
-  Future<void> _toggleJoin() async {
-    await _db.setJoined(_group.id!, !_group.joined);
-    setState(() => _group = _group.copyWith(joined: !_group.joined));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_group.joined ? 'Joined ${_group.name}' : 'Left ${_group.name}')),
-    );
-  }
+  // Future<void> _toggleJoin() async {
+  //   await _db.setJoined(_group.id!, !_group.joined);
+  //   setState(() => _group = _group.copyWith(joined: !_group.joined));
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(content: Text(_group.joined ? 'Joined ${_group.name}' : 'Left ${_group.name}')),
+  //   );
+  // }
 
   /// Opens dialog to create a new session, saves to DB, refreshes list
   Future<void> _createSession() async {
@@ -86,11 +86,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       title: Text(_group.name),
       actions: [
         // Join / Leave toggle
-        TextButton.icon(
-          onPressed: _toggleJoin,
-          icon: Icon(_group.joined ? Icons.logout : Icons.group_add, color: Colors.white),
-          label: Text(_group.joined ? 'Leave' : 'Join', style: const TextStyle(color: Colors.white)),
-        ),
+        // TextButton.icon(
+        //   // onPressed: _toggleJoin,
+        //   // icon: Icon(_group.joined ? Icons.logout : Icons.group_add, color: Colors.white),
+        //   // label: Text(_group.joined ? 'Leave' : 'Join', style: const TextStyle(color: Colors.white)),
+        // ),
         // Overflow menu (Edit)
         PopupMenuButton<String>(
           onSelected: (v) {
@@ -111,7 +111,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         const SizedBox(height: 8),
 
         // time + location
-        Text('${_group.meetingTime} • ${_group.location}'),
+        Text(_group.location),
         const SizedBox(height: 8),
 
         // open chat button

@@ -13,8 +13,9 @@ class CreateGroupDialog extends StatefulWidget {
 class _CreateGroupDialogState extends State<CreateGroupDialog> {
   // Controllers for form fields
   final _name = TextEditingController();
+  final _description = TextEditingController();
   final _subject = TextEditingController();
-  final _time = TextEditingController();
+  // final _time = TextEditingController();
   final _location = TextEditingController();
   final _tags = TextEditingController();
 
@@ -23,7 +24,7 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
     // Ensure required fields are filled
     if (_name.text.isEmpty ||
         _subject.text.isEmpty ||
-        _time.text.isEmpty ||
+        // _time.text.isEmpty ||
         _location.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
@@ -41,8 +42,8 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
     // Create a new StudyGroup object
     final g = StudyGroup(
       name: _name.text.trim(),
+      description: _description.text.trim(),
       subject: _subject.text.trim(),
-      meetingTime: _time.text.trim(),
       location: _location.text.trim(),
       tags: tags,
     );
@@ -74,26 +75,33 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
               ),
               const SizedBox(height: 8),
 
+              // Input fields for group info
+              TextField(
+                controller: _description,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+              const SizedBox(height: 16),
+
               TextField(
                 controller: _subject,
                 decoration: const InputDecoration(labelText: 'Subject *'),
               ),
               const SizedBox(height: 8),
 
-              TextField(
-                controller: _time,
-                decoration: const InputDecoration(
-                  labelText: 'Meeting Time *',
-                  hintText: 'e.g., Tuesdays 6:00 PM',
-                ),
-              ),
-              const SizedBox(height: 8),
+              // TextField(
+              //   controller: _time,
+              //   decoration: const InputDecoration(
+              //     labelText: 'Meeting Time *',
+              //     hintText: 'e.g., Tuesdays 6:00 PM',
+              //   ),
+              // ),
+              // const SizedBox(height: 8),
 
               TextField(
                 controller: _location,
                 decoration: const InputDecoration(
                   labelText: 'Location *',
-                  hintText: 'e.g., Library Room 204',
+                  hintText: 'e.g., 2000 Simcoe St. N',
                 ),
               ),
               const SizedBox(height: 8),

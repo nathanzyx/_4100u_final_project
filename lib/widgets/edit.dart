@@ -14,6 +14,7 @@ class EditGroupDialog extends StatefulWidget {
 class _EditGroupDialogState extends State<EditGroupDialog> {
   // Controllers prefilled with current group values
   late final TextEditingController _name;
+  late final TextEditingController _description;
   late final TextEditingController _subject;
   late final TextEditingController _time;
   late final TextEditingController _location;
@@ -23,8 +24,9 @@ class _EditGroupDialogState extends State<EditGroupDialog> {
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.group.name);
+    _description = TextEditingController(text: widget.group.description);
     _subject = TextEditingController(text: widget.group.subject);
-    _time = TextEditingController(text: widget.group.meetingTime);
+    // _time = TextEditingController(text: widget.group.meetingTime);
     _location = TextEditingController(text: widget.group.location);
     _tags = TextEditingController(text: widget.group.tags.join(', '));
   }
@@ -33,8 +35,9 @@ class _EditGroupDialogState extends State<EditGroupDialog> {
   void dispose() {
     // Clean up controllers to avoid memory leaks
     _name.dispose();
+    _description.dispose();
     _subject.dispose();
-    _time.dispose();
+    // _time.dispose();
     _location.dispose();
     _tags.dispose();
     super.dispose();
@@ -45,7 +48,7 @@ class _EditGroupDialogState extends State<EditGroupDialog> {
     // Basic required fields check
     if (_name.text.isEmpty ||
         _subject.text.isEmpty ||
-        _time.text.isEmpty ||
+        // _time.text.isEmpty ||
         _location.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
@@ -64,11 +67,11 @@ class _EditGroupDialogState extends State<EditGroupDialog> {
     final g = StudyGroup(
       id: widget.group.id,
       name: _name.text.trim(),
+      description: _description.text.trim(),
       subject: _subject.text.trim(),
-      meetingTime: _time.text.trim(),
+      // meetingTime: _time.text.trim(),
       location: _location.text.trim(),
       tags: tags,
-      joined: widget.group.joined,
     );
 
     Navigator.pop(context, g); // send updated group back to caller
@@ -98,16 +101,22 @@ class _EditGroupDialogState extends State<EditGroupDialog> {
               const SizedBox(height: 8),
 
               TextField(
+                controller: _description,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+              const SizedBox(height: 16),
+
+              TextField(
                 controller: _subject,
                 decoration: const InputDecoration(labelText: 'Subject *'),
               ),
               const SizedBox(height: 8),
 
-              TextField(
-                controller: _time,
-                decoration: const InputDecoration(labelText: 'Meeting Time *'),
-              ),
-              const SizedBox(height: 8),
+              // TextField(
+              //   controller: _time,
+              //   decoration: const InputDecoration(labelText: 'Meeting Time *'),
+              // ),
+              // const SizedBox(height: 8),
 
               TextField(
                 controller: _location,

@@ -123,7 +123,7 @@ class _HomePageState extends State<HomePage> {
       child: Card(
         child: ListTile(
           title: Text(g.name),
-          subtitle: Text('${g.subject}\n${g.meetingTime} • ${g.location}'),
+          subtitle: Text('${g.subject}\n${g.location}'),
           isThreeLine: true,
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
