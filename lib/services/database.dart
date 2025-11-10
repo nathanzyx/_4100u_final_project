@@ -228,7 +228,7 @@ class AppDb {
 
     final map = s.toMap()..remove('id');
 
-    map['createdById'] ??= userId;
+    map['creatorId'] ??= userId;
     map['created'] ??= DateTime.now().millisecondsSinceEpoch;
 
     return dbInst.insert('sessions', map);
