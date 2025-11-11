@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/chat_message.dart';
 import '../models/group.dart';
-import '../services/database.dart';
+import '../services/client/client_service.dart';
+import '../services/app_notifier.dart';
 
 // Per-group local chat screen (SQLite-backed)
 class ChatPage extends StatefulWidget {
@@ -13,10 +14,8 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final _db = AppDb();
+  final _client = ClientService();
   final _inputCtrl = TextEditingController();         // message composer
-
-  int? _localUserId;                                // local user ID
 
   // final _displayNameCtrl = TextEditingController(
   //   text: 'You',
@@ -30,75 +29,51 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _init() async {
-    final uid = await _db.getLocalUserId();
-    final msgs = await _db.getMessages(widget.group.id!);
+    final msgs = await _client.getMessages(widget.group.id!);
 
     setState(() {
-      _localUserId = uid;
       _messages = msgs;
     });
   }
 
   /// Loads all messages for this group (ascending by time)
   Future<void> _loadMessages() async {
-    final msgs = await _db.getMessages(widget.group.id!);
+    if (widget.group.id == null) return;
+    final msgs = await _client.getMessages(widget.group.id!);
     setState(() => _messages = msgs);
   }
 
   /// Sends the current input as a message (no-op if blank)
   Future<void> _sendMessage() async {
     final text = _inputCtrl.text.trim();
-    if (text.isEmpty) return;
-
-    // TEMPORARY: alert of uninitialized user (this is only an issue since full user functionality isn't done)
-    if (_localUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Still initializing user')),
-      );
-      return;
-    }
+    if (text.isEmpty || widget.group.id == null) return;
 
     final msg = ChatMessage(
       groupId: widget.group.id!,
-      creatorId: _localUserId!,
       text: text,
-      ts: DateTime.now(),
     );
 
-    await _db.addMessage(msg);
+    await _client.addMessage(msg);
     _inputCtrl.clear();
     await _loadMessages(); // refresh list
+
+    // Give a notification
+    AppNotifier.show(
+      context,
+      message: 'Message sent to ${widget.group.name}',
+      icon: Icons.chat_bubble_outline,
+    );
   }
 
   /// Nicely formats a timestamp like "2025-11-05 14:36"
-  String _formatTs(DateTime ts) => ts.toLocal().toString().substring(0, 16);
-
-  /// Opens a small dialog to edit the local display name
-  // Future<void> _editDisplayName() async {
-  //   await showDialog(
-  //     context: context,
-  //     builder: (_) => AlertDialog(
-  //       title: const Text('Display name'),
-  //       content: TextField(
-  //         controller: _displayNameCtrl,
-  //         decoration: const InputDecoration(hintText: 'e.g., Faryal'),
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(context),
-  //           child: const Text('Close'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  //   setState(() {}); // rebuild so alignment reflects new name
-  // }
+  String _formatTs(DateTime date) => date.toLocal().toString().substring(0, 16);
 
   /// One chat bubble (left/right aligned by author)
   Widget _buildMessageBubble(ChatMessage m) {
-    final isMine = _localUserId != null && m.creatorId == _localUserId;
+    final currentUserId = (_client.currentUser)!.id;
+    final isMine = m.creatorId == currentUserId;
     final align = isMine ? Alignment.centerRight : Alignment.centerLeft;
-    final authorLabel = isMine ? 'You' : 'User ${m.creatorId}';
+    final authorLabel = isMine ? 'You' : (m.creatorId != null ? 'User ${m.creatorId}' : 'Unknown');
 
     return Align(
       alignment: align,
@@ -123,7 +98,7 @@ class _ChatPageState extends State<ChatPage> {
             const SizedBox(height: 2),
             // timestamp
             Text(
-              _formatTs(m.ts),
+              _formatTs(m.date!),
               style: const TextStyle(fontSize: 11, color: Colors.black54),
             ),
           ],
@@ -160,20 +135,6 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
-
-  /// App bar with group title and a quick action to edit display name
-  // PreferredSizeWidget _buildAppBar() {
-  //   return AppBar(
-  //     title: Text('Chat • ${widget.group.name}'),
-  //     actions: [
-  //       IconButton(
-  //         tooltip: 'Change display name',
-  //         icon: const Icon(Icons.person),
-  //         onPressed: _editDisplayName,
-  //       ),
-  //     ],
-  //   );
-  // }
 
   @override
   Widget build(BuildContext context) {

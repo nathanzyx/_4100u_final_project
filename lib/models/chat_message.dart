@@ -5,7 +5,7 @@ class ChatMessage {
   final int? sessionId;     // ID of the session this message belongs to (optional)
   final int? creatorId;     // Name of the person who sent the message
   final String text;       // Message content
-  final DateTime ts;       // Timestamp of when the message was sent
+  final DateTime? date;       // Timestamp of when the message was sent
 
   ChatMessage({
     this.id,
@@ -13,7 +13,7 @@ class ChatMessage {
     this.sessionId,
     this.creatorId,
     required this.text,
-    required this.ts,
+    this.date,
   });
 
   // Converts this object to a Map for storing in the database
@@ -23,7 +23,7 @@ class ChatMessage {
     'sessionId': sessionId,
     'creatorId': creatorId,
     'text': text,
-    'ts': ts.millisecondsSinceEpoch,
+    'date': date?.millisecondsSinceEpoch,
   };
 
   // Recreates a ChatMessage object from a database record (Map)
@@ -31,8 +31,8 @@ class ChatMessage {
     id: m['id'] as int?,
     groupId: m['groupId'] as int,
     sessionId: m['sessionId'] as int?,
-    creatorId: m['creatorId'] as int,
+    creatorId: m['creatorId'] as int?,
     text: m['text'] as String,
-    ts: DateTime.fromMillisecondsSinceEpoch(  m['ts'] as int),
+    date: DateTime.fromMillisecondsSinceEpoch(  m['date'] as int),
   );
 }

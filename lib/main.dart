@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
+import 'services/client/client_service.dart';
 
-void main() => runApp(const StudyApp());
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ClientService().ensureUserInitialized();
+  runApp(const StudyApp());
+}
 
 class StudyApp extends StatelessWidget {
   const StudyApp({super.key});

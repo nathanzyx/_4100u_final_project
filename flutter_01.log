@@ -1,0 +1,141 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter --quiet assemble --no-version-check --depfile C:\csci4100u\Final_Project\_4100u_final_project\build\app\intermediates\flutter\debug/flutter_build.d --output C:\csci4100u\Final_Project\_4100u_final_project\build\app\intermediates\flutter\debug -dTargetFile=C:\csci4100u\Final_Project\_4100u_final_project\lib\main.dart -dTargetPlatform=android -dBuildMode=debug -dTrackWidgetCreation=true --DartDefines=RkxVVFRFUl9WRVJTSU9OPTMuMzUuMw==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049YTQwMmQ5YTQzNw==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049ZGRmNDdkZDNmZg==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My45LjI= -dFlavor= -dAndroidArchs=android-x64 -dMinSdkVersion=24 debug_android_application
+
+## exception
+
+_TypeError: type 'Null' is not a subtype of type 'String'
+
+```
+#0      _Platform.resolvedExecutable (dart:io/platform_impl.dart:37:38)
+#1      _Platform.resolvedExecutable (dart:io/platform_impl.dart)
+#2      Platform.resolvedExecutable (dart:io/platform.dart:198:53)
+#3      NativeAssetsBuildRunner._planner.<anonymous closure> (package:hooks_runner/src/build_runner/build_runner.dart:841:41)
+#4      NativeAssetsBuildRunner._planner (package:hooks_runner/src/build_runner/build_runner.dart:848:4)
+#5      NativeAssetsBuildRunner._planner (package:hooks_runner/src/build_runner/build_runner.dart)
+#6      NativeAssetsBuildRunner.packagesWithBuildHooks (package:hooks_runner/src/build_runner/build_runner.dart:91:27)
+#7      FlutterNativeAssetsBuildRunnerImpl.packagesWithNativeAssets (package:flutter_tools/src/isolated/native_assets/native_assets.dart:273:25)
+#8      _nativeBuildRequired (package:flutter_tools/src/isolated/native_assets/native_assets.dart:387:67)
+#9      runFlutterSpecificDartBuild (package:flutter_tools/src/isolated/native_assets/native_assets.dart:120:14)
+<asynchronous suspension>
+#10     DartBuild.build (package:flutter_tools/src/build_system/targets/native_assets.dart:73:16)
+<asynchronous suspension>
+#11     _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:873:9)
+<asynchronous suspension>
+#12     Future.wait.<anonymous closure> (dart:async/future.dart:525:21)
+<asynchronous suspension>
+#13     _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:811:32)
+<asynchronous suspension>
+#14     Future.wait.<anonymous closure> (dart:async/future.dart:525:21)
+<asynchronous suspension>
+#15     _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:811:32)
+<asynchronous suspension>
+#16     FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:631:16)
+<asynchronous suspension>
+#17     AssembleCommand.runCommand (package:flutter_tools/src/commands/assemble.dart:346:32)
+<asynchronous suspension>
+#18     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1581:27)
+<asynchronous suspension>
+#19     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#20     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#21     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:503:9)
+<asynchronous suspension>
+#22     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#23     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:438:5)
+<asynchronous suspension>
+#24     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:98:11)
+<asynchronous suspension>
+#25     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#26     main (package:flutter_tools/executable.dart:101:3)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[☠] Flutter (the doctor check crashed)
+    ✗ Due to an error, the doctor check did not complete. If the error message below is not helpful, please let us know about this issue at https://github.com/flutter/flutter/issues.
+    ✗ Exception: Could not find directory at C:\Users\natht\Flutter\flutter\bin\cache\dart-sdk/bin/resources/devtools
+    • #0      Cache.devToolsVersion (package:flutter_tools/src/cache.dart:426:9)
+      #1      _DefaultDoctorValidatorsProvider.validators.<anonymous closure> (package:flutter_tools/src/doctor.dart:129:46)
+      #2      FlutterValidator.validateImpl (package:flutter_tools/src/doctor.dart:585:84)
+      #3      DoctorValidator.validate (package:flutter_tools/src/doctor_validator.dart:58:43)
+      #4      Doctor.startValidatorTasks.<anonymous closure> (package:flutter_tools/src/doctor.dart:236:72)
+      #5      asyncGuard.<anonymous closure> (package:flutter_tools/src/base/async_guard.dart:108:32)
+      #6      _rootRun (dart:async/zone.dart:1525:13)
+      #7      _CustomZone.run (dart:async/zone.dart:1422:19)
+      #8      _runZoned (dart:async/zone.dart:2034:6)
+      #9      runZonedGuarded (dart:async/zone.dart:2020:12)
+      #10     asyncGuard (package:flutter_tools/src/base/async_guard.dart:106:3)
+      #11     Doctor.startValidatorTasks (package:flutter_tools/src/doctor.dart:226:9)
+      #12     DoctorText._validatorTasks (package:flutter_tools/src/doctor.dart:836:60)
+      #13     DoctorText._validatorTasks (package:flutter_tools/src/doctor.dart)
+      #14     DoctorText._runDiagnosis (package:flutter_tools/src/doctor.dart:841:32)
+      #15     DoctorText.text (package:flutter_tools/src/doctor.dart:832:36)
+      #16     DoctorText.text (package:flutter_tools/src/doctor.dart)
+      #17     _createLocalCrashReport (package:flutter_tools/runner.dart:283:51)
+      #18     _handleToolError (package:flutter_tools/runner.dart:244:31)
+      <asynchronous suspension>
+      #19     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+      <asynchronous suspension>
+      #20     main (package:flutter_tools/executable.dart:101:3)
+      <asynchronous suspension>
+
+
+[✓] Windows Version (11 Home 64-bit, 24H2, 2009) [3.0s]
+
+[✓] Android toolchain - develop for Android devices (Android SDK version 36.1.0-rc1) [5.7s]
+    • Android SDK at C:\Users\natht\AppData\Local\Android\sdk
+    • Emulator version 36.1.9.0 (build_id 13823996) (CL:N/A)
+    • Platform android-36, build-tools 36.1.0-rc1
+    • Java binary at: C:\Program Files\Android\Android Studio\jbr\bin\java
+      This is the JDK bundled with the latest Android Studio installation on this machine.
+      To manually set the JDK path, use: `flutter config --jdk-dir="path/to/jdk"`.
+    • Java version OpenJDK Runtime Environment (build 21.0.7+-13880790-b1038.58)
+    • All Android licenses accepted.
+
+[✓] Chrome - develop for the web [355ms]
+    • Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[✓] Visual Studio - develop Windows apps (Visual Studio Community 2022 17.14.16) [351ms]
+    • Visual Studio at C:\Program Files\Microsoft Visual Studio\2022\Community
+    • Visual Studio Community 2022 version 17.14.36518.9
+    • Windows 10 SDK version 10.0.26100.0
+
+[✓] Android Studio (version 2025.1.3) [17ms]
+    • Android Studio at C:\Program Files\Android\Android Studio
+    • Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    • Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+    • Java version OpenJDK Runtime Environment (build 21.0.7+-13880790-b1038.58)
+
+[✓] IntelliJ IDEA Ultimate Edition (version 2023.3) [14ms]
+    • IntelliJ at C:\Program Files\JetBrains\IntelliJ IDEA 2023.3.3
+    • Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    • Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+
+[✓] VS Code (version 1.105.1) [12ms]
+    • VS Code at C:\Users\natht\AppData\Local\Programs\Microsoft VS Code
+    • Flutter extension version 3.122.0
+
+[✓] Connected device (4 available) [917ms]
+    • sdk gphone64 x86 64 (mobile) • emulator-5554 • android-x64    • Android 16 (API 36) (emulator)
+    • Windows (desktop)            • windows       • windows-x64    • Microsoft Windows [Version 10.0.26100.6899]
+    • Chrome (web)                 • chrome        • web-javascript • Google Chrome 135.0.7049.96
+    • Edge (web)                   • edge          • web-javascript • Microsoft Edge 142.0.3595.53
+
+[✓] Network resources [912ms]
+    • All expected network resources are available.
+
+! Doctor found issues in 1 category.
+```

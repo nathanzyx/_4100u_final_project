@@ -16,7 +16,7 @@ class _EditGroupDialogState extends State<EditGroupDialog> {
   late final TextEditingController _name;
   late final TextEditingController _description;
   late final TextEditingController _subject;
-  late final TextEditingController _time;
+  // late final TextEditingController _time;
   late final TextEditingController _location;
   late final TextEditingController _tags;
 

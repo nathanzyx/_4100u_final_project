@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:study_connect/models/group.dart';
 import 'package:study_connect/models/session.dart';
 import 'package:study_connect/pages/chat_page.dart';
-import 'package:study_connect/services/database.dart';
 import 'package:study_connect/widgets/create_session.dart';
 import 'package:study_connect/widgets/edit.dart';
+import '../services/client/client_service.dart';
 
 // Group details screen:
 // - Join/Leave group
@@ -20,7 +20,7 @@ class GroupDetailsPage extends StatefulWidget {
 }
 
 class _GroupDetailsPageState extends State<GroupDetailsPage> {
-  final _db = AppDb();
+  final _client = ClientService();
   late StudyGroup _group;                 // current group (updates after edit/join)
   List<StudySession> _sessions = [];      // sessions for this group
 
@@ -33,7 +33,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
   /// Loads sessions for this group
   Future<void> _load() async {
-    final s = await _db.getSessionsForGroup(_group.id!);
+    final s = await _client.getSessionsForGroup(_group.id!);
     setState(() => _sessions = s);
   }
 
@@ -53,7 +53,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       builder: (_) => CreateSessionDialog(groupId: _group.id!),
     );
     if (created != null) {
-      await _db.addSession(created);
+      await _client.addSession(created);
       await _load();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session created')));
     }
@@ -61,7 +61,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
   /// Deletes a session and refreshes list
   Future<void> _deleteSession(StudySession s) async {
-    await _db.deleteSession(s.id!);
+    await _client.deleteSession(s.id!);
     await _load();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Session deleted')));
   }
@@ -73,7 +73,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       builder: (_) => EditGroupDialog(group: _group),
     );
     if (updated != null) {
-      await _db.updateGroup(updated);
+      await _client.updateGroup(updated);
       setState(() => _group = updated);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Group updated')));
     }
@@ -141,7 +141,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
           onPressed: () => _deleteSession(s),
         ),
         onTap: () async {
-          await _db.incrementAttendees(s.id!); // "join" the session
+          // await _client.incrementAttendees(s.id!); // "join" the session
           await _load();
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Joined session')));
         },

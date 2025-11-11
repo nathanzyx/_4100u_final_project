@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:study_connect/models/group.dart';
 import 'package:study_connect/pages/group_details_page.dart';
-import 'package:study_connect/services/database.dart';
 import 'package:study_connect/services/tips.dart';
 import 'package:study_connect/widgets/create_group.dart';
+import '../services/client/client_service.dart';
 
 // Home screen of StudyConnect:
 // - Shows a "Study Tip of the Day"
@@ -18,7 +18,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _db = AppDb();                     // database helper
+  final _client = ClientService();
   final _search = TextEditingController(); // search box controller
 
   List<StudyGroup> _groups = [];           // loaded list of groups
@@ -32,7 +32,7 @@ class _HomePageState extends State<HomePage> {
 
   /// Loads study groups and the daily tip
   Future<void> _load() async {
-    final g = await _db.getGroups();
+    final g = await _client.getGroups();
     final tip = await TipsService.fetchDailyTip();
     setState(() {
       _groups = g;
@@ -47,7 +47,7 @@ class _HomePageState extends State<HomePage> {
       builder: (_) => const CreateGroupDialog(),
     );
     if (g != null) {
-      await _db.addGroup(g);
+      await _client.addGroup(g);
       await _load();
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Group created')));
@@ -56,7 +56,7 @@ class _HomePageState extends State<HomePage> {
 
   /// Deletes a selected group and updates the list
   Future<void> _deleteGroup(StudyGroup g) async {
-    await _db.deleteGroup(g.id!);
+    await _client.deleteGroup(g.id!);
     await _load();
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text('Deleted "${g.name}"')));
