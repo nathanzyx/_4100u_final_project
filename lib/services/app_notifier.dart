@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 
   - simple class (for now) for showing notifications
 
-  - When we implement the server, this will be more thourgouhly used
+  - When we implement the server, this will be more thouroughly used
 
 */
 class AppNotifier {

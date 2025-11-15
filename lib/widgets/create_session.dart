@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/session.dart';
+import 'package:study_connect_shared/models/session.dart';
 
 // Dialog for creating a new StudySession
 // - Collects title, date, start/end times, location, and capacity

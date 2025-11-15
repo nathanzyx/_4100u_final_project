@@ -1,15 +1,15 @@
 import 'package:path/path.dart';
-import 'package:sqflite/sqflite.dart';
-import '../../models/user.dart';
-import '../../models/group.dart';
-import '../../models/session.dart';
-import '../../models/chat_message.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:study_connect_shared/models/user.dart';
+import 'package:study_connect_shared/models/group.dart';
+import 'package:study_connect_shared/models/session.dart';
+import 'package:study_connect_shared/models/chat_message.dart';
 
 // SQLite database handler for StudyConnect
 // Handles all CRUD operations for:
-//  - groups     → study communities
-//  - sessions   → group study events
-//  - messages   → per-group chat messages
+//  - groups     -> study communities
+//  - sessions   -> group study events
+//  - messages   -> per-group chat messages
 class AppDb {
   static final AppDb _i = AppDb._();  // singleton instance
   AppDb._();

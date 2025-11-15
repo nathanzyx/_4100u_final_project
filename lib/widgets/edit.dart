@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/group.dart';
+import 'package:study_connect_shared/models/group.dart';
 
 // Dialog for editing an existing StudyGroup
 // Returns the updated StudyGroup via Navigator.pop(...)

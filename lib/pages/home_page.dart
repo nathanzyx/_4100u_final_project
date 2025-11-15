@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:study_connect/models/group.dart';
+import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect/pages/group_details_page.dart';
 import 'package:study_connect/services/tips.dart';
 import 'package:study_connect/widgets/create_group.dart';
-import '../services/client/client_service.dart';
+import '../services/client/client_services.dart';
 
 // Home screen of StudyConnect:
 // - Shows a "Study Tip of the Day"

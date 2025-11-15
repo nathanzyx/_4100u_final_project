@@ -43,6 +43,12 @@ dependencies:
   http: ^1.2.2       # Used for fetching daily study tips from an API
   # ---------------------------------------------
 
+  #
+  # Shared package between the main flutter app, and the server (study_connect_server)
+  #
+  study_connect_shared:
+    path: ./study_connect_shared
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

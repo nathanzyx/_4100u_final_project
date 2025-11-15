@@ -1,0 +1,24 @@
+name: study_connect_server
+description: A sample command-line application.
+version: 1.0.0
+# repository: https://github.com/my_org/my_repo
+
+environment:
+  sdk: ^3.9.2
+
+# Add regular dependencies here.
+dependencies:
+  # sqflite: ^2.3.3   # Local database for storing sessions/groups
+  sqflite_common_ffi: ^2.3.3  # instead of sqflite
+  path: ^1.9.0       # Helps sqflite locate the correct database path
+  http: ^1.2.2       # Used for fetching daily study tips from an API
+
+  #
+  # Shared package between the main flutter app, and the server (study_connect_server)
+  #
+  study_connect_shared:
+    path: ../study_connect_shared
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

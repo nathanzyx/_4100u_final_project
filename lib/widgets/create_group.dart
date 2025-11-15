@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/group.dart';
+import 'package:study_connect_shared/models/group.dart';
 
 // Dialog for creating a new StudyGroup
 // Appears as a popup form where users can enter group details

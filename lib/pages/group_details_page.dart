@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:study_connect/models/group.dart';
-import 'package:study_connect/models/session.dart';
+import 'package:study_connect_shared/models/group.dart';
+import 'package:study_connect_shared/models/session.dart';
 import 'package:study_connect/pages/chat_page.dart';
 import 'package:study_connect/widgets/create_session.dart';
 import 'package:study_connect/widgets/edit.dart';
-import '../services/client/client_service.dart';
+import '../services/client/client_services.dart';
 
 // Group details screen:
 // - Join/Leave group
