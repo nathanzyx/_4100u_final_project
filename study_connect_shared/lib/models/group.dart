@@ -8,7 +8,6 @@ class StudyGroup {
   final List<String> tags;      // Keywords/tags like “Math” or “History”
   final int? creatorId;     // Dormant field for future use
   final int? created;        // Dormant field for future use
-  // final bool joined;            // Whether the current user has joined
 
   StudyGroup({
     this.id,
@@ -19,7 +18,6 @@ class StudyGroup {
     this.tags = const [],
     this.creatorId,
     this.created,
-    // this.joined = false,
   });
 
   // Creates a modified copy (used for toggling joined state)
@@ -32,7 +30,6 @@ class StudyGroup {
     tags: tags,
     creatorId: creatorId,
     created: created,
-    // joined: joined ?? this.joined,
   );
 
   // Converts the group into a Map for database storage
@@ -45,7 +42,6 @@ class StudyGroup {
     'tags': tags.join('|'),
     'creatorId': creatorId,
     'created': created,
-    // 'joined': joined ? 1 : 0,
   };
 
   // Recreates a StudyGroup object from a Map (when reading from DB)
@@ -56,8 +52,7 @@ class StudyGroup {
     subject: m['subject'] as String,
     location: m['location'] as String,
     tags: (m['tags'] as String?)?.split('|') ?? const [],
-    creatorId: m['creatorId'] as int,
+    creatorId: m['creatorId'] as int?,
     created: m['created'] as int?,
-    // joined: (m['joined'] as int? ?? 0) == 1,
   );
 }

@@ -48,7 +48,7 @@ class StudySession {
     location: m['location'] as String,
     maxAttendees: m['maxAttendees'] as int,
     attendees: (m['attendees'] as int?) ?? 0,
-    creatorId: m['creatorId'] as int,
+    creatorId: m['creatorId'] as int?,
     created: DateTime.fromMillisecondsSinceEpoch(m['created'] as int),
   );
 }

@@ -16,14 +16,16 @@ import 'dart:convert';
 
 */
 class ClientService {
-  static final ClientService _i = ClientService._();  // singleton instance
+  static final ClientService _i = ClientService._();  // singleton
   ClientService._();
   factory ClientService() => _i;
 
   // Client API grabbing so we can make calls to the server
   final ApiClient _api = ApiClient.instance;
 
+
   User? currentUser;
+
 
   /*
 
@@ -31,23 +33,44 @@ class ClientService {
 
   */
   /*
-    bool::isConnected()
+    ap<String, String>::authHeaders()
 
-    helper to return status of the connection to the server.
+    helper to get headers for client-server user authorization
   */
-  Future<bool> isConnected() async
+  Map<String, String> _authHeaders()
   {
-    return true;
+    if (currentUser == null)
+    {
+      throw Exception('No current user set for authenticated request.');
+    }
+    return
+    {
+      'X-User-Id': currentUser!.id.toString(),
+      'X-Auth-Token': currentUser!.authToken,
+    };
   }
   /*
     User::getLocalUser()
 
     helper to return the user data stored on device.
   */
-  Future<User> getLocalUser() async
+  Future<User> _getLocalUser() async
   {
     // temporary, will fix when local (mobile device) storage is implemented
     return await createUser();
+  }
+  /*
+    User::ensureUser()
+
+    helper to ensure this device has a user logged on
+  */
+  Future<User> _ensureUser() async 
+  {
+    if (currentUser != null) return currentUser!;
+
+    final user = await createUser();
+    currentUser = user;
+    return user;
   }
 
 
@@ -78,28 +101,6 @@ class ClientService {
     return user;
   }
   /*
-    User?::authenicateUser()
-
-    calls server to authenticate the current user based on username and password. If
-    successful, return the full profile of that user (login), otherwise return null
-
-    NOTE: username and password have not yet been implemented, relies on id for now.
-  */
-  Future<User?> authenicateUser() async {
-    if (currentUser == null) return null;
-
-    final result = await _api.get('/users/${currentUser!.id}');
-
-    if (result.statusCode == 404) return null;
-    if (result.statusCode != 200) throw Exception('Failed to authenticate user: ${currentUser!.id}');
-
-    final map = Map<String, Object?>.from(jsonDecode(result.body) as Map<String, dynamic>);
-
-    final user = User.fromMap(map);
-    currentUser = user; // set the authenticated user as the current user for the device
-    return user;
-  }
-  /*
     String?::getUserDisplayName(int userId)
 
     calls server to fetch the displayName of a user.
@@ -127,14 +128,22 @@ class ClientService {
       throw Exception('No current user on this device');
     }
 
-    final result = await _api.putJson('/users/${currentUser!.id}', {'displayName': newDisplayName});
+    final result = await _api.putJson(
+      '/users/${currentUser!.id}',
+      {'displayName': newDisplayName},
+      headers: _authHeaders()
+    );
 
     if (result.statusCode != 200) throw Exception('Failed to rename user: ${currentUser!.id}');
 
+    // update the local user data to use the new diplay name
     currentUser = User
     (
       id: currentUser!.id,
       displayName: newDisplayName,
+      username: currentUser!.username,
+      password: currentUser!.password,
+      authToken: currentUser!.authToken,
       created: currentUser!.created,
     );
   }
@@ -146,7 +155,10 @@ class ClientService {
   Future<void> deleteUser() async {
     if (currentUser == null) throw Exception('No current user on this device');
 
-    final result = await _api.delete('/users/${currentUser!.id}');
+    final result = await _api.delete(
+      '/users/${currentUser!.id}',
+      headers: _authHeaders()
+    );
 
     if (result.statusCode != 200 && result.statusCode != 204) 
     {
@@ -195,14 +207,21 @@ class ClientService {
   */
   Future<void> addGroup(StudyGroup group) async 
   {
-    final body = group.toMap()..remove('id');
+    final body = group.toMap()
+    ..remove('id')
+    ..remove('creatorId')
+    ..remove('created');
 
     if (group.creatorId == null) 
     {
       body['creatorId'] = currentUser!.id;
     }
 
-    final result = await _api.postJson('/groups', Map<String, dynamic>.from(body));
+    final result = await _api.postJson(
+      '/groups',
+      Map<String, dynamic>.from(body),
+      headers: _authHeaders()
+    );
 
     if (result.statusCode != 201 && result.statusCode != 200) 
     {
@@ -220,7 +239,10 @@ class ClientService {
   {
     if (group.id == null) throw Exception('Group does not have an ID');
 
-    final result = await _api.putJson('/groups/${group.id}', Map<String, dynamic>.from(group.toMap()));
+    final result = await _api.putJson('/groups/${group.id}',
+      Map<String, dynamic>.from(group.toMap()),
+      headers: _authHeaders()
+    );
 
     if (result.statusCode != 200) 
     {
@@ -243,7 +265,8 @@ class ClientService {
       {
         'joined': joined,
         'userId': currentUser!.id
-      }
+      },
+      headers: _authHeaders()
     );
 
     if (result.statusCode != 200) 
@@ -265,7 +288,10 @@ class ClientService {
   {
     if (currentUser == null) throw Exception('No current user to delete any groups of');
 
-    final result = await _api.delete('/groups/$groupId');
+    final result = await _api.delete(
+      '/groups/$groupId',
+      headers: _authHeaders()
+    );
 
     if (result.statusCode != 200 && result.statusCode != 204) 
     {
@@ -317,7 +343,8 @@ class ClientService {
 
     final result = await _api.postJson(
       '/groups/${session.groupId}/sessions', 
-      Map<String, dynamic>.from(body)
+      Map<String, dynamic>.from(body),
+      headers: _authHeaders()
       );
 
     if (result.statusCode != 201 && result.statusCode != 200) 
@@ -339,7 +366,10 @@ class ClientService {
   {
     if (currentUser == null) throw Exception('No current user to delete a session for');
 
-    final result = await _api.delete('/sessions/$sessionId');
+    final result = await _api.delete(
+      '/sessions/$sessionId',
+      headers: _authHeaders()
+    );
 
     if (result.statusCode != 200 && result.statusCode != 204) 
     {
@@ -369,7 +399,7 @@ class ClientService {
   */
   Future<List<ChatMessage>> getMessages(int groupId) async 
   {
-    final result = await _api.get('/group/$groupId/messages');
+    final result = await _api.get('/groups/$groupId/messages');
 
     if (result.statusCode != 200) 
     {
@@ -392,18 +422,18 @@ class ClientService {
   */
   Future<void> addMessage(ChatMessage message) async 
   {
+    final user = await _ensureUser();
     if (currentUser == null) throw Exception('No current user to add a message for');
 
-    final body = message.toMap()..remove('id');
-
-    if(message.creatorId == null) 
-    {
-      body['creatorId'] = currentUser!.id;
-    }
+    final body = message.toMap()
+    ..remove('id')
+    ..remove('creatorId')
+    ..remove('date');
 
     final result = await _api.postJson(
       '/groups/${message.groupId}/messages',
-      Map<String, dynamic>.from(body)
+      Map<String, dynamic>.from(body), // maybe just body
+      headers: _authHeaders()
     );
 
     if (result.statusCode != 201 && result.statusCode != 200) 
@@ -425,7 +455,10 @@ class ClientService {
   {
     if (currentUser == null) throw Exception('No current user to delete a message for');
 
-    final result = await _api.delete('/groups/$messageId');
+    final result = await _api.delete(
+      '/messages/$messageId',
+      headers: _authHeaders()
+      );
 
     if (result.statusCode != 200 && result.statusCode != 204) 
     {

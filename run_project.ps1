@@ -79,6 +79,6 @@ try{
 }
 finally
 {
-    Write-Host "StudyConnect app finished." -ForegroundColor Cyan
     Stop-StudyConnectServer
+    Write-Host "StudyConnect app finished." -ForegroundColor Cyan
 }

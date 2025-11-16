@@ -72,8 +72,10 @@ class _ChatPageState extends State<ChatPage> {
 
   /// One chat bubble (left/right aligned by author)
   Widget _buildMessageBubble(ChatMessage m) {
-    final currentUserId = (_client.currentUser)!.id;
-    final isMine = m.creatorId == currentUserId;
+    final currentUser = _client.currentUser;
+    final currentUserId = currentUser?.id;
+
+    final bool isMine = (currentUserId != null && m.creatorId == currentUserId);
     final align = isMine ? Alignment.centerRight : Alignment.centerLeft;
     final authorLabel = isMine ? 'You' : (m.creatorId != null ? 'User ${m.creatorId}' : 'Unknown');
 

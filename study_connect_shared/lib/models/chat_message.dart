@@ -33,6 +33,6 @@ class ChatMessage {
     sessionId: m['sessionId'] as int?,
     creatorId: m['creatorId'] as int?,
     text: m['text'] as String,
-    date: DateTime.fromMillisecondsSinceEpoch(  m['date'] as int),
+    date: m['date'] == null ? null : DateTime.fromMillisecondsSinceEpoch(m['date'] as int),
   );
 }

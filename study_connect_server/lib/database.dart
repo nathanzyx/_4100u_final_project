@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:study_connect_shared/models/user.dart';
 import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect_shared/models/session.dart';
 import 'package:study_connect_shared/models/chat_message.dart';
+import 'dart:math';
 
 // SQLite database handler for StudyConnect
 // Handles all CRUD operations for:
@@ -16,6 +19,16 @@ class AppDb {
   factory AppDb() => _i;
 
   Database? _db; // holds the open database connection
+
+  final _random = Random.secure();
+  String _getRandomString(int length) 
+  {
+    String chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    return List.generate(
+      length,
+      (a) => chars[_random.nextInt(chars.length)]
+      ).join();
+  }
 
   // Lazily initializes the database if not already open
   Future<Database> get db async {
@@ -46,6 +59,9 @@ class AppDb {
           CREATE TABLE users(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             displayName TEXT NOT NULL,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            authToken TEXT NOT NULL,
             created INTEGER NOT NULL
           );
         ''');
@@ -151,23 +167,32 @@ class AppDb {
       // },
 
 
-        // ----------------------------------------------------------
-        // DEMO SEED DATA (generated, just for example visuals)
-        // ----------------------------------------------------------
+        // DEMO SEED DATA (just for example visuals, remove later)
         final now = DateTime.now();
         int ms(DateTime dt) => dt.millisecondsSinceEpoch;
 
         // Users
         final aliceId = await d.insert('users', {
           'displayName': 'Alice',
+          'username': 'alice',
+          'password': 'alicepw',
+          'authToken': 'seed_alice_token',
           'created': ms(now.subtract(const Duration(days: 10))),
         });
+
         final bobId = await d.insert('users', {
           'displayName': 'Bob',
+          'username': 'bob',
+          'password': 'bobpw',
+          'authToken': 'seed_bob_token',
           'created': ms(now.subtract(const Duration(days: 8))),
         });
+
         final charlieId = await d.insert('users', {
           'displayName': 'Charlie',
+          'username': 'charlie',
+          'password': 'charliepw',
+          'authToken': 'seed_charlie_token',
           'created': ms(now.subtract(const Duration(days: 5))),
         });
 
@@ -215,7 +240,7 @@ class AppDb {
           'created': ms(now.subtract(const Duration(days: 1))),
         });
 
-        final calcSess2Id = await d.insert('sessions', {
+        await d.insert('sessions', {
           'groupId': calcGroupId,
           'title': 'Derivatives Practice Marathon',
           'start': ms(now.add(const Duration(days: 3, hours: 18))),
@@ -308,22 +333,6 @@ class AppDb {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       onUpgrade: (d, oldV, newV) async {
         // safeguard: recreate missing message table if needed
         await d.execute('CREATE TABLE IF NOT EXISTS messages('
@@ -352,14 +361,27 @@ class AppDb {
   {
     final db_ = await db;
     final displayName = 'New User';
+    final username = 'user_${_getRandomString(10)}';
+    final password = _getRandomString(10);
+    final authToken = _getRandomString(50);
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final id = await db_.insert('users', {
         'displayName': displayName,
+        'username': username,
+        'password': password,
+        'authToken': authToken,
         'created': now,
     });
 
-    return User(id: id, displayName: displayName, created: now);
+    return User(
+      id: id,
+      displayName: displayName,
+      username: username,
+      password: password,
+      authToken: authToken,
+      created: now
+    );
   }
 
   //
@@ -384,27 +406,6 @@ class AppDb {
     // if authentication fails, 
     return false;
 
-  }
-
-  // since we have not implemented passwords, this isnt true authentication
-  Future<User?> authenticateUser(User user) async 
-  {
-    // authenticate user first to ensure proper credentials
-    if (await authenticateUserBool(user) == false) { return null; }
-    final db_ = await db;
-    final rows = await db_.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [user.id],
-      limit: 1,
-    );
-    if (rows.isEmpty) return null; // user doesnt exist
-
-    return User(
-      id: rows.first['id'] as int, 
-      displayName: rows.first['displayName'] as String, 
-      created: rows.first['created'] as int
-    );
   }
 
   // This is vulnerable, when we implement the server we must secure it
@@ -436,27 +437,24 @@ class AppDb {
     return rows.first['displayName'] as String;
   }
 
-  Future<void> setUserDisplayName(User user, String newDisplayName) async
+  Future<void> setUserDisplayName(int userId, String newDisplayName) async
   {
-    if (await authenticateUserBool(user) == false) { return; }
     final db_ = await db;
     await db_.update(
       'users',
       {'displayName': newDisplayName},
       where: 'id = ?',
-      whereArgs: [user.id],
+      whereArgs: [userId],
     );
-    // return (await getUserDisplayName(user.id) == newDisplayName); // if boolean method
   }
 
-  Future<void> deleteUser(User user) async
+  Future<void> deleteUser(int id) async
   {
-    if (await authenticateUserBool(user) == false) { return; }
     final db_ = await db;
     await db_.delete(
       'users',
       where: 'id = ?',
-      whereArgs: [user.id],
+      whereArgs: [id],
     );
   }
 
@@ -467,21 +465,34 @@ class AppDb {
   */
 
   /// Fetches all groups (sorted by name)
-  Future<List<StudyGroup>> getGroups() async {
+  Future<List<StudyGroup>> getGroups() async
+  {
     final rows = await (await db).query('groups', orderBy: 'name ASC');
     return rows.map(StudyGroup.fromMap).toList();
   }
 
-  /// Inserts a new group into the database
-  Future<void> addGroup(User user, StudyGroup g) async {
-    if (await authenticateUserBool(user) == false) { return; }
+  // Fetches group given by id
+  Future<StudyGroup?> getGroupById(int id) async
+  {
+      final db_ = await db;
+      final rows = await db_.query(
+      'groups',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return StudyGroup.fromMap(rows.first);
+  }
 
+  /// Inserts a new group into the database
+  Future<void> insertGroup(StudyGroup g) async
+  {
     final dbInst = await db;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final map = g.toMap()
     ..remove('id')
-    ..['creatorId'] = user.id
     ..['created'] ??= now;
 
     dbInst.insert('groups', map);
@@ -491,11 +502,8 @@ class AppDb {
   }
 
   /// Updates an existing group’s info
-  Future<void> updateGroup(User user, StudyGroup g) async
+  Future<void> updateGroup(StudyGroup g) async
   {
-    // BAD: we need to ensure the user is the creator of the group
-    if (await authenticateUserBool(user) == false) { return; }
-
     final db_ = await db;
     await db_.update(
     'groups', {
@@ -510,17 +518,15 @@ class AppDb {
   );
   }
 
-  Future<void> setJoined(User user, int groupId, bool joined) async {
+  Future<void> setJoined(int userId, int groupId, bool joined) async
+  {
     // todo
     return;
   }
 
   /// Deletes a group by ID
-  Future<void> deleteGroup(User user, int id) async
+  Future<void> deleteGroup(int id) async
   {
-    // BAD: we need to ensure the user is the creator of the group
-    if (await authenticateUserBool(user) == false) { return; }
-
     (await db).delete('groups', where: 'id=?', whereArgs: [id]);
   }
 
@@ -531,7 +537,8 @@ class AppDb {
   */
 
   /// Returns all sessions belonging to a specific group
-  Future<List<StudySession>> getSessionsForGroup(int groupId) async {
+  Future<List<StudySession>> getSessionsForGroup(int groupId) async
+  {
     final rows = await (await db).query(
       'sessions',
       where: 'groupId=?',
@@ -541,43 +548,56 @@ class AppDb {
     return rows.map(StudySession.fromMap).toList();
   }
 
+  // Fetches group given by id
+  Future<StudySession?> getSessionById(int id) async
+  {
+      final db_ = await db;
+      final rows = await db_.query(
+      'sessions',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return StudySession.fromMap(rows.first);
+  }
+
   /// Adds a new study session
-  Future<void> addSession(User user, StudySession s) async {
-    if (await authenticateUserBool(user) == false) { return; }
+  Future<void> addSession(StudySession s) async
+  {
     final dbInst = await db;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final map = s.toMap()
       ..remove('id')
-      ..['creatorId'] = user.id
       ..['created'] = now;
 
     dbInst.insert('sessions', map);
   }
 
   /// Deletes a specific session
-  Future<void> deleteSession(User user, int id) async {
-    // BAD: we need to ensure the user is the creator of the session
-    if (await authenticateUserBool(user) == false) { return; }
-
+  Future<void> deleteSession(int id) async
+  {
     (await db).delete('sessions', where: 'id=?', whereArgs: [id]);
   }
 
   /// Increments attendee count for a session (e.g., when someone joins)
   /// This probably shouldnt be counted this way (REMOVE LATER, MAYBE)
-  Future<void> incrementAttendees(int id, {int delta = 1}) async {
+  Future<void> incrementAttendees(int id, {int delta = 1}) async
+  {
     await (await db).rawUpdate(
       'UPDATE sessions SET attendees = attendees + ? WHERE id = ?',
       [delta, id],
     );
   }
 
-  // --------------------------------------------------------------------------
-  // MESSAGES (per-group chat)
-  // --------------------------------------------------------------------------
+  /*
+    Messages
+  */
 
   /// Loads all messages for a specific group (oldest → newest)
-  Future<List<ChatMessage>> getMessages(int groupId) async {
+  Future<List<ChatMessage>> getMessages(int groupId) async
+  {
     final rows = await (await db).query(
       'messages',
       where: 'groupId=?',
@@ -587,28 +607,37 @@ class AppDb {
     return rows.map(ChatMessage.fromMap).toList();
   }
 
+  // Fetches group given by id
+  Future<ChatMessage?> getMessageById(int id) async
+  {
+      final db_ = await db;
+      final rows = await db_.query(
+      'messages',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return ChatMessage.fromMap(rows.first);
+  }
+
   /// Adds a new chat message
-  Future<void> addMessage(User user, ChatMessage m) async {
-    // should add future authentication (such as ensuring user is
-    // part of the group the message is being sent into)
-    if (await authenticateUserBool(user) == false) { return; }
+  Future<void> addMessage(ChatMessage m) async
+  {
 
     final dbInst = await db;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final map = m.toMap()
       ..remove('id')
-      ..['creatorId'] = user.id
       ..['date'] = now;
 
     dbInst.insert('messages', map);
   }
 
   /// Deletes a chat message by ID
-  Future<void> deleteMessage(User user, int id) async {
-    // BAD: we need to ensure the user is the creator of the message
-    if (await authenticateUserBool(user) == false) { return; }
-
+  Future<void> deleteMessage(int id) async
+  {
     (await db).delete('messages', where: 'id=?', whereArgs: [id]);
   }
 }

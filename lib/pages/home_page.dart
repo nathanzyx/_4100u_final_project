@@ -19,6 +19,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _client = ClientService();
+
   final _search = TextEditingController(); // search box controller
 
   List<StudyGroup> _groups = [];           // loaded list of groups
