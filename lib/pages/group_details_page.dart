@@ -23,6 +23,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   final _client = ClientService();
   late StudyGroup _group;                 // current group (updates after edit/join)
   List<StudySession> _sessions = [];      // sessions for this group
+  final TextEditingController _sessionSearchCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -33,7 +34,12 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
 
   /// Loads sessions for this group
   Future<void> _load() async {
-    final s = await _client.getSessionsForGroup(_group.id!);
+    final q = _sessionSearchCtrl.text.trim();
+    final s = await _client.getSessionsForGroup
+    (
+      _group.id!,
+      query: q.isEmpty ? null : q
+      );
     setState(() => _sessions = s);
   }
 
@@ -85,12 +91,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     return AppBar(
       title: Text(_group.name),
       actions: [
-        // Join / Leave toggle
-        // TextButton.icon(
-        //   // onPressed: _toggleJoin,
-        //   // icon: Icon(_group.joined ? Icons.logout : Icons.group_add, color: Colors.white),
-        //   // label: Text(_group.joined ? 'Leave' : 'Join', style: const TextStyle(color: Colors.white)),
-        // ),
         // Overflow menu (Edit)
         PopupMenuButton<String>(
           onSelected: (v) {
@@ -125,6 +125,20 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         ),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _buildSessionSearchBox() {
+    return TextField(
+      controller: _sessionSearchCtrl,
+      decoration: const InputDecoration(
+        prefixIcon: Icon(Icons.search),
+        hintText: 'Search sessions...',
+        border: OutlineInputBorder(),
+      ),
+      onChanged: (_) {
+        _load();
+      },
     );
   }
 
@@ -170,6 +184,9 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         padding: const EdgeInsets.all(16),
         children: [
           _buildHeader(),
+          const SizedBox(height: 8),
+          _buildSessionSearchBox(),
+          const SizedBox(height: 16),
           _buildSessionsList(),
         ],
       ),

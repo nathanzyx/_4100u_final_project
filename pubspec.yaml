@@ -49,6 +49,12 @@ dependencies:
   study_connect_shared:
     path: ./study_connect_shared
 
+  # For Android device local storage
+  shared_preferences: ^2.5.3
+
+  # for notifications
+  flutter_local_notifications: ^19.5.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

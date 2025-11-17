@@ -79,7 +79,12 @@ Future<void> _handleRequest(HttpRequest request, AppDb db) async
     else if (root == 'messages') 
     {
       await _handleMessages(request, db, segments, method);
-    } else 
+    } 
+    else if (root == 'notifications') 
+    {
+      await _handleNotifications(request, db, segments, method);
+    } 
+    else 
     {
       _notFound(request);
     }
@@ -107,9 +112,29 @@ Future<void> _handleUsers
     {
       final user = await db.createUser();
       _json(request, user.toMap(), statusCode: HttpStatus.created);
-    } else 
+    }
+    else 
     {
       _methodNotAllowed(request, ['POST']);
+    }
+    return;
+  }
+  /*
+    /users/auth
+  */
+  if (segments.length == 2 && segments[1] == 'auth') 
+  {
+    if (method == 'GET')
+    {
+      final user = await _requireAuth(request, db);
+      if (user == null) return;
+
+      // Since authorized, return full data for the authorized user
+      _json(request, user.toMap());
+    }
+    else
+    {
+      _methodNotAllowed(request, ['GET']);
     }
     return;
   }
@@ -124,8 +149,7 @@ Future<void> _handleUsers
       _badRequest(request, 'Invalid User Id');
       return;
     }
-
-    if (method == 'GET')
+    if (method == 'GET') // public user getter (only returns public user data)
     {
       final user = await db.getUserById(id);
       if (user == null) 
@@ -134,7 +158,13 @@ Future<void> _handleUsers
       }
       else 
       {
-        _json(request, user.toMap());
+        _json(request,
+        {
+          'id': user.id,
+          'displayName': user.displayName,
+          'created': user.created
+        }
+        );
       }
     } 
     else if (method == 'PUT')
@@ -201,8 +231,33 @@ Future<void> _handleGroups
   {
     if(method == 'GET') 
     {
-      final groups = await db.getGroups();
-      final list = groups.map((groups) => groups.toMap()).toList();
+      final q = request.uri.queryParameters;
+
+      // limit
+      final limit = _parseLimit(q, def: 50, max: 100);
+
+      // filters
+      final query = q['query'];
+      final subject = q['subject'];
+      final location = q['location'];
+      final tag = q['tag'];
+
+      // time
+      final beforeCreated = _parseIntParam(q, 'beforeCreated');
+      final afterCreated = _parseIntParam(q, 'afterCreated');
+
+      final groups = await db.getGroups
+      (
+        text: query,
+        subject: subject,
+        location: location,
+        tag: tag,
+        limit: limit,
+        beforeCreated: beforeCreated,
+        afterCreated: afterCreated,
+      );
+
+      final list = groups.map((g) => g.toMap()).toList();
       _json(request, list);
     }
     else if (method == 'POST') 
@@ -363,7 +418,7 @@ Future<void> _handleGroups
         return;
       }
 
-      await db.setJoined(user.id, groupId, joined);
+      await db.setJoinedGroup(user.id, groupId, joined);
       _json(request, {'success': 'true'});
       return;
     }
@@ -375,8 +430,33 @@ Future<void> _handleGroups
     {
       if(method == 'GET') 
       {
-        final sessions = await db.getSessionsForGroup(groupId);
-        final list = sessions.map((session) => session.toMap()).toList();
+        final qp = request.uri.queryParameters;
+
+        // limit
+        final limit = _parseLimit(qp, def: 50, max: 100);
+        // filters
+        final query = qp['query'];
+        final location = qp['location'];
+
+        // session start and end times
+        final startFrom = _parseIntParam(qp, 'startFrom');
+        final startTo = _parseIntParam(qp, 'startTo');
+        final endFrom = _parseIntParam(qp, 'endFrom');
+        final endTo = _parseIntParam(qp, 'endTo');
+
+        final sessions = await db.getSessionsForGroup
+        (
+          groupId,
+          text: query,
+          location: location,
+          startFromMs: startFrom,
+          startToMs: startTo,
+          endFromMs: endFrom,
+          endToMs: endTo,
+          limit: limit,
+        );
+
+        final list = sessions.map((s) => s.toMap()).toList();
         _json(request, list);
       }
       else if (method == 'POST') 
@@ -398,6 +478,7 @@ Future<void> _handleGroups
           id: null,
           groupId: s.groupId,
           title: s.title,
+          description: s.description,
           start: s.start,
           end: s.end,
           location: s.location,
@@ -424,8 +505,28 @@ Future<void> _handleGroups
     {
       if(method == 'GET') 
       {
-        final messages = await db.getMessages(groupId);
-        final list = messages.map((message) => message.toMap()).toList();
+        final qp = request.uri.queryParameters;
+
+        final limit = _parseLimit(qp, def: 50, max: 100);
+        final beforeMs = _parseIntParam(qp, 'before');
+        final afterMs = _parseIntParam(qp, 'after');
+
+        final query = qp['query'];
+        final sessionId = _parseIntParam(qp, 'sessionId');
+        final creatorId = _parseIntParam(qp, 'creatorId');
+
+        final messages = await db.getMessages
+        (
+          groupId,
+          limit: limit,
+          beforeMs: beforeMs,
+          afterMs: afterMs,
+          text: query,
+          sessionId: sessionId,
+          creatorId: creatorId,
+        );
+
+        final list = messages.map((m) => m.toMap()).toList();
         _json(request, list);
       }
       else if (method == 'POST') 
@@ -451,7 +552,16 @@ Future<void> _handleGroups
           text: clientMessage.text,
           date: DateTime.now()
         );
-        final created = await db.addMessage(message);
+        final messageId = await db.addMessage(message);
+
+        // create notifications for group members except the message writer
+        await db.insertNotificationsForNewMessage
+        (
+          message.groupId,
+          messageId,
+          user.id
+        );
+
         _json(request, {'success': 'true'});
         return;
       }
@@ -477,36 +587,94 @@ Future<void> _handleSessions
   /*
     /session/{id}
   */
-  if(segments.length == 2 && method == 'DELETE') 
+  if(segments.length == 2) 
   {
-    // authentication
-    final user = await _requireAuth(request, db);
-    if (user == null) return;
-
     final id = int.tryParse(segments[1]);
-    if (id == null) 
+    if (id == null)
     {
       _badRequest(request, 'Null session id.');
       return;
     }
 
-    final session = await db.getSessionById(id);
-    if (session == null)
+    /*
+      /sessions/{id}
+    */
+    if (segments.length == 2)
     {
-      _notFound(request);
+      if (method == 'DELETE')
+      {
+      // authentication
+      final user = await _requireAuth(request, db);
+      if (user == null) return;
+
+      final id = int.tryParse(segments[1]);
+      if (id == null) 
+      {
+        _badRequest(request, 'Null session id.');
+        return;
+      }
+
+      final session = await db.getSessionById(id);
+      if (session == null)
+      {
+        _notFound(request);
+        return;
+      }
+
+      if (session.creatorId != user.id) 
+      {
+        _forbidden(request);
+        return;
+      }
+
+      await db.deleteSession(id);
+      request.response.statusCode = HttpStatus.noContent;
+      await request.response.close();
+      return;
+      }
+    }
+    /*
+      /sessions/{id}/joined
+    */
+    if (segments.length == 3 && segments[2] == 'joined')
+    {
+      if (method != 'POST')
+      {
+        _methodNotAllowed(request, ['POST']);
+        return;
+      }
+
+      // authentication
+      final user = await _requireAuth(request, db);
+      if (user == null) return;
+
+      final body = await utf8.decoder.bind(request).join();
+      if (body.isEmpty)
+      {
+        _badRequest(request, 'Missing Request Body');
+        return;
+      }
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final joined = data['joined'] as bool?;
+      final userId = data['userId'] as int?;
+      if (joined == null || userId == null)
+      {
+        _badRequest(request, '\'joined\' or \'userId\' is null.');
+        return;
+      }
+
+      // ensure user joining is the same as the user making this request
+      if (userId != user.id)
+      {
+        _forbidden(request);
+        return;
+      }
+
+      await db.setJoinedSession(user.id, id, joined);
+      _json(request, {'success': 'true'});
       return;
     }
-
-    if (session.creatorId != user.id) 
-    {
-      _forbidden(request);
-      return;
-    }
-
-    await db.deleteSession(id);
-    request.response.statusCode = HttpStatus.noContent;
-    await request.response.close();
-    return;
   }
   _notFound(request);
 }
@@ -555,6 +723,67 @@ Future<void> _handleMessages
     await request.response.close();
     return;
   }
+  _notFound(request);
+}
+
+
+
+Future<void> _handleNotifications
+(
+  HttpRequest request,
+  AppDb db,
+  List<String> segments,
+  String method
+) async
+{
+  /*
+    /notifications
+  */
+  if (segments.length == 1)
+  {
+    if (method != 'GET')
+    {
+      _methodNotAllowed(request, ['GET']);
+      return;
+    }
+
+    // authorize user
+    final user = await _requireAuth(request, db);
+    if (user == null) return;
+
+    final qp = request.uri.queryParameters;
+    final sinceMs = _parseIntParam(qp, 'since');
+    final limit = _parseLimit(qp, def: 50, max: 100);
+
+    final rows = await db.getUnreadNotificationsForUser
+    (
+      user.id,
+      sinceMs: sinceMs,
+      limit: limit,
+    );
+
+    // mark as read right away
+    final ids = rows.map((r) => r['notifId']).whereType<int>().toList();
+    await db.markNotificationsAsRead(ids);
+
+    // make response
+    final list = rows.map((r)
+    {
+      return {
+        'id': r['notifId'],
+        'groupId': r['groupId'],
+        'groupName': r['groupName'],
+        'messageId': r['messageId'],
+        'messageText': r['messageText'],
+        'messageDate': r['messageDate'],
+        'created': r['notifCreated'],
+      };
+    }).toList();
+
+    _json(request, list);
+    return;
+  }
+
   _notFound(request);
 }
 
@@ -625,5 +854,32 @@ Future<User?> _requireAuth
   if (user == null || user.authToken != token) { _unauthorized(request); return null; }
 
   return user;
+}
+
+int _parseLimit
+(
+  Map<String, String> queryParams,
+  {
+    int def = 50,
+    int max = 100
+  }
+) 
+{
+  final raw = queryParams['limit'];
+  final parsed = raw != null ? int.tryParse(raw) : null;
+  if (parsed == null || parsed <= 0) return def;
+  if (parsed > max) return max;
+  return parsed;
+}
+
+int? _parseIntParam
+(
+  Map<String, String> qp,
+  String key
+)
+{
+  final raw = qp[key];
+  if (raw == null) return null;
+  return int.tryParse(raw);
 }
 

@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
+import 'services/client/client_services.dart';
+import 'services/notification_service.dart';
 
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await ClientService().ensureUser();
+  await NotificationService.instance.init();
+
   runApp(const StudyApp());
 }
 

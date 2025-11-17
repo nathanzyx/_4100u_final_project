@@ -15,6 +15,7 @@ class CreateSessionDialog extends StatefulWidget {
 class _CreateSessionDialogState extends State<CreateSessionDialog> {
   // Text controllers for inputs
   final _title = TextEditingController();
+  final _description = TextEditingController();
   final _location = TextEditingController();
   final _max = TextEditingController(text: '12');
 
@@ -101,6 +102,7 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
     final s = StudySession(
       groupId: widget.groupId,
       title: _title.text.trim(),
+      description: _description.text.trim(),
       start: start,
       end: end,
       location: _location.text.trim(),

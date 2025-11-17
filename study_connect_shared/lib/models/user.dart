@@ -7,7 +7,6 @@ class User {
   final String authToken;
   final int created; // Account creation timestamp
 
-
   User({
     required this.id,
     required this.displayName,

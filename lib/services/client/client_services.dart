@@ -5,6 +5,9 @@ import 'package:study_connect_shared/models/session.dart';
 import 'package:study_connect_shared/models/chat_message.dart';
 import 'client_api.dart';
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:study_connect/services/notification_service.dart';
+import 'dart:async';
 
 /*
 
@@ -19,19 +22,38 @@ class ClientService {
   static final ClientService _i = ClientService._();  // singleton
   ClientService._();
   factory ClientService() => _i;
-
-  // Client API grabbing so we can make calls to the server
   final ApiClient _api = ApiClient.instance;
+  
+  // For notifications
+  Timer? _notificationTimer;
+  int? _lastNotificationCheckMs;
 
 
+
+  // local user
   User? currentUser;
+  Future<User> ensureUser() => _ensureUser();
 
+  static const _userIdKey = 'local_user_id';
+  static const _userDisplayNameKey = 'local_user_displayName';
+  static const _userUsernameKey = 'local_user_username';
+  static const _userPasswordKey = 'local_user_password';
+  static const _userAuthTokenKey = 'local_user_authToken';
+  static const _userCreatedKey = 'local_user_created';
 
   /*
 
     Core app helpers
 
   */
+  Map<String, String> _authHeadersForUser(User u)
+  {
+    return 
+    {
+      'X-User-Id': u.id.toString(),
+      'X-Auth-Token': u.authToken.toString()
+    };
+  }
   /*
     ap<String, String>::authHeaders()
 
@@ -43,34 +65,143 @@ class ClientService {
     {
       throw Exception('No current user set for authenticated request.');
     }
-    return
-    {
-      'X-User-Id': currentUser!.id.toString(),
-      'X-Auth-Token': currentUser!.authToken,
-    };
+    return _authHeadersForUser(currentUser!);
   }
   /*
     User::getLocalUser()
 
     helper to return the user data stored on device.
   */
-  Future<User> _getLocalUser() async
+  Future<User?> _getLocalUserFromStorage() async
   {
-    // temporary, will fix when local (mobile device) storage is implemented
-    return await createUser();
+    final l = await SharedPreferences.getInstance();
+
+    final id = l.getInt(_userIdKey);
+    final displayName = l.getString(_userDisplayNameKey);
+    final username = l.getString(_userUsernameKey);
+    final password = l.getString(_userPasswordKey);
+    final authToken = l.getString(_userAuthTokenKey);
+    final created = l.getInt(_userCreatedKey);
+
+    // Expect local to hold all user data, if not, assume no user on local device (set null)
+    if 
+    (
+      id == null ||
+      displayName == null ||
+      username == null ||
+      password == null ||
+      authToken == null ||
+      created == null
+    ) { return null; }
+
+    return User
+    (
+      id: id,
+      displayName: displayName,
+      username: username,
+      password: password,
+      authToken: authToken,
+      created: created
+    );
   }
   /*
-    User::ensureUser()
+    void::_saveLocalUserToStorage(User user)
 
-    helper to ensure this device has a user logged on
+    helper to save the local user data to the device.
   */
-  Future<User> _ensureUser() async 
+  Future<void> _saveLocalUserToStorage(User user) async
   {
-    if (currentUser != null) return currentUser!;
+    final l = await SharedPreferences.getInstance();
+    await l.setInt(_userIdKey, user.id);
+    await l.setString(_userDisplayNameKey, user.displayName);
+    await l.setString(_userUsernameKey, user.username);
+    await l.setString(_userPasswordKey, user.password);
+    await l.setString(_userAuthTokenKey, user.authToken);
+    await l.setInt(_userCreatedKey, user.created);
+  }
+  /*
+    void::_clearLocalUserFromStorage()
 
-    final user = await createUser();
-    currentUser = user;
-    return user;
+    helper to erase local user from the device storage.
+    (clears persistant user, not hot-path client side user)
+  */
+  Future<void> _clearLocalUserFromStorage() async 
+  {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userIdKey);
+    await prefs.remove(_userDisplayNameKey);
+    await prefs.remove(_userUsernameKey);
+    await prefs.remove(_userPasswordKey);
+    await prefs.remove(_userAuthTokenKey);
+    await prefs.remove(_userCreatedKey);
+  }
+  /*
+    User::_ensureUser()
+
+    helper to ensure a user is registered to the device.
+  */
+  Future<User> _ensureUser() async
+  {
+    print("DEBUG ENSURE USER CALLED");
+    // hot-path user check first
+    if (currentUser != null) {
+      final refreshed = await _validateUserWithServer(currentUser!);
+      if (refreshed != null) 
+      {
+        print("CURRENT USER IS VALID");
+        currentUser = refreshed;
+        await _saveLocalUserToStorage(refreshed);
+        return refreshed;
+      }
+    }
+
+    // if live client user isn't valid
+    final localUserFromStorage = await _getLocalUserFromStorage();
+    if (localUserFromStorage != null)
+    {
+      final refreshed = await _validateUserWithServer(localUserFromStorage);
+      if (refreshed != null) 
+      {
+        print("SAVED USER FROM DEVICE STORAGE");
+        currentUser = refreshed;
+        await _saveLocalUserToStorage(refreshed);
+        return refreshed;
+      }
+    }
+
+    print("LOCALIZATION FAILED, CREATING NEW USER");
+    // If we cannot retreive a valid account locally, create a new account
+    // (We assume this is the first time this device is using the app)
+    final newUser = await createUser();
+    currentUser = newUser;
+    await _saveLocalUserToStorage(newUser);
+    return newUser;
+  }
+  /*
+    bool::_validateUserWithServer(User)
+
+    helper to validate a users credentials with the server.
+  */
+  Future<User?> _validateUserWithServer(User user) async
+  {
+    try 
+    {
+      final result = await _api.get(
+        '/users/auth',
+        headers: _authHeadersForUser(user)
+      );
+
+      if (result.statusCode != 200) 
+      {
+        return null;
+      }
+      final map = Map<String, Object?>.from(jsonDecode(result.body) as Map<String, dynamic>);
+      return User.fromMap(map);
+    }
+    catch (e) 
+    {
+      return null;
+    }
   }
 
 
@@ -97,7 +228,8 @@ class ClientService {
 
     final map = Map<String, Object>.from(jsonDecode(result.body) as Map<String, dynamic>);
     final user = User.fromMap(map);
-    currentUser = user; // set the newly created user as the current user for the device
+    currentUser = user; // set the newly created user as the current user for the device memory
+    await _saveLocalUserToStorage(user); // set the newly created user for the devices persistance storage
     return user;
   }
   /*
@@ -165,7 +297,8 @@ class ClientService {
       throw Exception('Failed to delete user: ${result.statusCode}');
     }
 
-    currentUser = null;
+    currentUser = null; // remove this user from devices memory
+    await _clearLocalUserFromStorage(); // remove this user from the devices persistant storage
   }
 
 
@@ -185,18 +318,58 @@ class ClientService {
     NOTE: This is vulnerable in fetching too much data, must be fixed in the future. Maybe
       instead we can get all a certain number of groups at a time.
   */
-  Future<List<StudyGroup>> getGroups() async
+  Future<List<StudyGroup>> getGroups
+  (
+    {
+      String? query,
+      String? subject,
+      String? location,
+      String? tag,
+      int limit = 50,
+      int? beforeCreatedMs,
+      int? afterCreatedMs,
+    }
+  ) async
   {
-    final result = await _api.get('/groups');
+    final params = <String, String>{
+      'limit': limit.toString(),
+    };
+    if (query != null && query.trim().isNotEmpty)
+    {
+      params['query'] = query.trim();
+    }
+    if (subject != null && subject.trim().isNotEmpty)
+    {
+      params['subject'] = subject.trim();
+    }
+    if (location != null && location.trim().isNotEmpty)
+    {
+      params['location'] = location.trim();
+    }
+    if (tag != null && tag.trim().isNotEmpty)
+    {
+      params['tag'] = tag.trim();
+    }
+    if (beforeCreatedMs != null)
+    {
+      params['beforeCreated'] = beforeCreatedMs.toString();
+    }
+    if (afterCreatedMs != null)
+    {
+      params['afterCreated'] = afterCreatedMs.toString();
+    }
 
-    if (result.statusCode != 200) throw Exception('Failed to fetch groups: ${result.statusCode}');
+    final queryString = params.entries.map((e) =>'${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+    final result = await _api.get('/groups?$queryString');
+    
+    if (result.statusCode != 200)
+    {
+      throw Exception('Failed to fetch groups: ${result.statusCode}');
+    }
 
-    final List<dynamic> groups = jsonDecode(result.body) as List<dynamic>;
+    final List<dynamic> groupsJson = jsonDecode(result.body) as List<dynamic>;
 
-    return groups
-      .map((json) =>
-        StudyGroup.fromMap(Map<String, Object?>.from(json as Map)))
-      .toList();
+    return groupsJson.map((json) => StudyGroup.fromMap(Map<String, Object?>.from(json as Map),)).toList();
   }
   /*
     void::addGroup(StudyGroup group)
@@ -235,7 +408,7 @@ class ClientService {
 
     - StudyGroup group: the group to update.
   */
-  Future<void> updateGroup(StudyGroup group) async
+  Future<bool> updateGroup(StudyGroup group) async
   {
     if (group.id == null) throw Exception('Group does not have an ID');
 
@@ -244,10 +417,17 @@ class ClientService {
       headers: _authHeaders()
     );
 
-    if (result.statusCode != 200) 
+    if (result.statusCode == 200) 
     {
-      throw Exception('Failed to update group: ${result.statusCode}');
+      return true;
     }
+    // check for forbidden (user doesnt own the group)
+    if (result.statusCode == 403) 
+    {
+      return false;
+    }
+
+    throw Exception('Failed to update group: ${result.statusCode}');
   }
   /*
     void::setJoined(int groupId, bool joined)
@@ -257,7 +437,7 @@ class ClientService {
     - int groupId: the group the current user is joining.
     - bool joined: the joined status (true = joined, false = not joined).
   */
-  Future<void> setJoined(int groupId, bool joined) async 
+  Future<bool> setJoinedGroup(int groupId, bool joined) async 
   {
     if (currentUser == null) throw Exception('No current user to join a group');
 
@@ -269,10 +449,15 @@ class ClientService {
       headers: _authHeaders()
     );
 
-    if (result.statusCode != 200) 
-    {
-      throw Exception('Failed to join group: ${result.statusCode}');
+    if (result.statusCode == 200) {
+      return true;
     }
+    // check for forbidden (user doesnt own the group)
+    if (result.statusCode == 403) {
+      return false;
+    }
+
+    throw Exception('Failed to join group: ${result.statusCode}');
   }
   /*
     void::deleteGroup(int groupId)
@@ -284,7 +469,7 @@ class ClientService {
     NOTE: this currently doesnt match the users credentials against the group, so
       its vulnerable to misuse. Fix later.
   */
-  Future<void> deleteGroup(int groupId) async 
+  Future<bool> deleteGroup(int groupId) async 
   {
     if (currentUser == null) throw Exception('No current user to delete any groups of');
 
@@ -293,10 +478,17 @@ class ClientService {
       headers: _authHeaders()
     );
 
-    if (result.statusCode != 200 && result.statusCode != 204) 
+    if (result.statusCode == 200 && result.statusCode == 204) 
     {
-      throw Exception('Failed to delete group: ${result.statusCode}');
+      return true;
     }
+    // check for forbidden (user doesnt own the group)
+    if (result.statusCode == 403) 
+    {
+      return false;
+    }
+
+    throw Exception('Failed to delete group: ${result.statusCode}');
   }
 
   /*
@@ -310,23 +502,63 @@ class ClientService {
     calls server to fetch all sessions inside a group (community).
 
     - int groupId: the group that the sessions belong
-    
-    NOTE: This is vulnerable in fetching too much data, must be fixed in the future. Maybe
-      instead we can get all a certain number of sessions at a time.
   */
-  Future<List<StudySession>> getSessionsForGroup(int groupId) async 
+  Future<List<StudySession>> getSessionsForGroup
+  (
+    int groupId,
+    {
+      String? query,
+      String? location,
+      DateTime? startFrom,
+      DateTime? startTo,
+      DateTime? endFrom,
+      DateTime? endTo,
+      int limit = 50
+    }
+  ) async 
   {
-    final result = await _api.get('/groups/$groupId/sessions');
+    final params = <String, String>
+    {
+      'limit': limit.toString(),
+    };
 
-    if (result.statusCode != 200) 
+    if (query != null && query.trim().isNotEmpty)
+    {
+      params['query'] = query.trim();
+    }
+    if (location != null && location.trim().isNotEmpty)
+    {
+      params['location'] = location.trim();
+    }
+    if (startFrom != null)
+    {
+      params['startFrom'] = startFrom.millisecondsSinceEpoch.toString();
+    }
+    if (startTo != null)
+    {
+      params['startTo'] = startTo.millisecondsSinceEpoch.toString();
+    }
+    if (endFrom != null)
+    {
+      params['endFrom'] = endFrom.millisecondsSinceEpoch.toString();
+    }
+    if (endTo != null)
+    {
+      params['endTo'] = endTo.millisecondsSinceEpoch.toString();
+    }
+
+    final queryString = params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+
+    final result = await _api.get('/groups/$groupId/sessions?$queryString');
+
+    if (result.statusCode != 200)
     {
       throw Exception('Failed to fetch sessions: ${result.statusCode}');
     }
 
     final List<dynamic> decoded = jsonDecode(result.body) as List<dynamic>;
 
-    return decoded.map((json) =>
-      StudySession.fromMap(Map<String, Object?>.from(json as Map))).toList();
+    return decoded.map((json) => StudySession.fromMap(Map<String, Object?>.from(json as Map),)).toList();
   }
   /*
     void::addSession(StudySession session)
@@ -334,10 +566,8 @@ class ClientService {
     calls server to add a new session.
 
     - StudySession session: the session to add, is added to the group of groupId.
-
-    NOTE: eventually, we need a solid way to set the creator (currently manual)
   */
-  Future<void> addSession(StudySession session) async 
+  Future<bool> addSession(StudySession session) async 
   {
     final body = session.toMap()..remove('id');
 
@@ -347,10 +577,17 @@ class ClientService {
       headers: _authHeaders()
       );
 
-    if (result.statusCode != 201 && result.statusCode != 200) 
+    if (result.statusCode == 200 || result.statusCode == 201) 
     {
-      throw Exception('Failed to add session: ${result.statusCode}');
+      return true;
     }
+    // check for forbidden (user isn't apart of the group)
+    if (result.statusCode == 403) 
+    {
+      return false;
+    }
+
+    throw Exception('Failed to add session: ${result.statusCode}');
   }
   /*
     void::deleteSession(int sessionId)
@@ -358,11 +595,8 @@ class ClientService {
     calls server to delete a session.
 
     - int sessionId: the id of the session to delete.
-
-    NOTE: we must also pass user data (or use a session key) to ensure the session being
-      deleted belongs to the user calling for its deletion.
   */
-  Future<void> deleteSession(int sessionId) async 
+  Future<bool> deleteSession(int sessionId) async 
   {
     if (currentUser == null) throw Exception('No current user to delete a session for');
 
@@ -371,10 +605,54 @@ class ClientService {
       headers: _authHeaders()
     );
 
-    if (result.statusCode != 200 && result.statusCode != 204) 
+    if (result.statusCode == 200 || result.statusCode == 204) 
     {
-      throw Exception('Failed to delete session: ${result.statusCode}');
+      return true;
     }
+    // check for forbidden (user doesnt own the group)
+    if (result.statusCode == 403) 
+    {
+      return false;
+    }
+
+    throw Exception('Failed to delete session: ${result.statusCode}');
+  }
+  /*
+    bool::setSessionJoined(int sessionId, bool joined)
+
+    calls server to join the user in a session.
+
+    - int sessionId: the id of the session to delete.
+    - bool joined: the join status if the user (false = leave).
+  */
+  Future<bool> setSessionJoined(int sessionId, bool joined) async
+  {
+    if (currentUser == null)
+    {
+      throw Exception('No current user to join a session');
+    }
+
+    final result = await _api.postJson
+    (
+      '/sessions/$sessionId/joined',
+      {
+        'joined': joined,
+        'userId': currentUser!.id,
+      },
+      headers: _authHeaders(),
+    );
+
+    if (result.statusCode == 200)
+    {
+      return true;
+    }
+    // not used rn
+    if (result.statusCode == 403)
+    {
+      return false;
+    }
+
+    throw Exception('Failed to join session: ${result.statusCode}');
   }
 
 
@@ -393,23 +671,58 @@ class ClientService {
 
     - int groupId: the id of the group which messages we want.
 
-    NOTE: This is vulnerable in fetching too much data, must be fixed in the future. Maybe
-      instead we can get all a certain number of messages at a time (maybe within a time
-      line).
   */
-  Future<List<ChatMessage>> getMessages(int groupId) async 
+  Future<List<ChatMessage>> getMessages
+  (
+    int groupId,
+    {
+      int limit = 50,
+      DateTime? before,
+      DateTime? after,
+      String? query,
+      int? sessionId,
+      int? creatorId,
+    }
+  ) async 
   {
-    final result = await _api.get('/groups/$groupId/messages');
+    final params = <String, String>
+    {
+      'limit': limit.toString(),
+    };
 
-    if (result.statusCode != 200) 
+    if (before != null)
+    {
+      params['before'] = before.millisecondsSinceEpoch.toString();
+    }
+    if (after != null)
+    {
+      params['after'] = after.millisecondsSinceEpoch.toString();
+    }
+    if (query != null && query.trim().isNotEmpty)
+    {
+      params['query'] = query.trim();
+    }
+    if (sessionId != null)
+    {
+      params['sessionId'] = sessionId.toString();
+    }
+    if (creatorId != null)
+    {
+      params['creatorId'] = creatorId.toString();
+    }
+
+    final queryString = params.entries.map((e) =>'${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+
+    final result = await _api.get('/groups/$groupId/messages?$queryString');
+
+    if (result.statusCode != 200)
     {
       throw Exception('Failed to fetch messages: ${result.statusCode}');
     }
 
     final List<dynamic> decoded = jsonDecode(result.body) as List<dynamic>;
 
-    return decoded.map((json) =>
-      ChatMessage.fromMap(Map<String, Object?>.from(json as Map))).toList();
+    return decoded.map((json) => ChatMessage.fromMap(Map<String, Object?>.from(json as Map))).toList();
   }
   /*
     void::addMessage(ChatMessage message)
@@ -417,12 +730,9 @@ class ClientService {
     calls server to add a new message withing a group (community).
 
     - ChatMessage message: message to send. Sends to group described in message.groupId
-
-    NOTE: We need a server-side way to set creatorId, not rely on the client
   */
-  Future<void> addMessage(ChatMessage message) async 
+  Future<bool> addMessage(ChatMessage message) async 
   {
-    final user = await _ensureUser();
     if (currentUser == null) throw Exception('No current user to add a message for');
 
     final body = message.toMap()
@@ -432,14 +742,21 @@ class ClientService {
 
     final result = await _api.postJson(
       '/groups/${message.groupId}/messages',
-      Map<String, dynamic>.from(body), // maybe just body
+      Map<String, dynamic>.from(body),
       headers: _authHeaders()
     );
 
-    if (result.statusCode != 201 && result.statusCode != 200) 
-    {
-      throw Exception('Failed to add message: ${result.statusCode}');
+    if (result.statusCode == 201 || result.statusCode == 200) {
+      return true;
     }
+
+    // not applicable right now
+    if (result.statusCode == 403) 
+    {
+      return false;
+    }
+
+    throw Exception('Failed to add message: ${result.statusCode}');
   }
   /*
     void::deleteMessage(int messageId)
@@ -451,7 +768,7 @@ class ClientService {
     NOTE: We need a server-side solution to ensure the message being deleted belongs to the
       user trying to delete it.
   */
-  Future<void> deleteMessage(int messageId) async
+  Future<bool> deleteMessage(int messageId) async
   {
     if (currentUser == null) throw Exception('No current user to delete a message for');
 
@@ -459,10 +776,95 @@ class ClientService {
       '/messages/$messageId',
       headers: _authHeaders()
       );
+    
+    if (result.statusCode == 201 || result.statusCode == 200) {
+      return true;
+    }
 
-    if (result.statusCode != 200 && result.statusCode != 204) 
+    if (result.statusCode == 401 || result.statusCode == 403) {
+      return false;
+    }
+
+    throw Exception('Failed to delete message: ${result.statusCode}');
+  }
+
+
+
+
+
+
+
+
+
+
+  /*
+
+    Notifications
+
+  */
+  void startNotificationPolling()
+  {
+    _notificationTimer?.cancel();
+    _lastNotificationCheckMs = DateTime.now().millisecondsSinceEpoch;
+    _notificationTimer = Timer.periodic
+    (
+      const Duration(seconds: 10),
+      (_) => _pollNotifications(),
+    );
+  }
+
+  void stopNotificationPolling()
+  {
+    _notificationTimer?.cancel();
+    _notificationTimer = null;
+  }
+
+  Future<void> _pollNotifications() async
+  {
+    try
     {
-      throw Exception('Failed to delete message: ${result.statusCode}');
+      final user = currentUser ?? await ensureUser();
+
+      final params = <String, String>{};
+      if (_lastNotificationCheckMs != null) {
+        params['since'] = _lastNotificationCheckMs!.toString();
+      }
+
+      final queryString = params.isEmpty ? '' : '?' + params.entries.map((e) =>'${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+
+      final result = await _api.get
+      (
+        '/notifications$queryString',
+        headers: _authHeadersForUser(user),
+      );
+
+      // successful
+      if (result.statusCode != 200)
+      {
+        return;
+      }
+
+      final List<dynamic> decoded =jsonDecode(result.body) as List<dynamic>;
+      if (decoded.isEmpty) {
+        return;
+      }
+
+      _lastNotificationCheckMs = DateTime.now().millisecondsSinceEpoch;
+
+      for (final raw in decoded)
+      {
+        final m = Map<String, Object?>.from(raw as Map);
+
+        final groupName = (m['groupName'] as String?) ?? 'New message';
+        final text = (m['messageText'] as String?) ?? '';
+
+        // finally, send notification
+        await NotificationService.instance.showMessageNotification(groupName, text);
+      }
+    } catch (e)
+    {
+      throw Exception("Notification service error.");
     }
   }
+
 }

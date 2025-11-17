@@ -108,6 +108,20 @@ class AppDb {
 
         /*
 
+        */
+        await d.execute('''
+          CREATE TABLE group_members(
+            userId INTEGER NOT NULL,
+            groupId INTEGER NOT NULL,
+            joinedAt INTEGER NOT NULL,
+            PRIMARY KEY(userId, groupId),
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(groupId) REFERENCES groups(id) ON DELETE CASCADE
+          );
+        ''');
+
+        /*
+
         Session
 
           - A session represents a scheduled study event within a group
@@ -122,6 +136,7 @@ class AppDb {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             groupId INTEGER NOT NULL,
             title TEXT NOT NULL,
+            description TEXT,
             start INTEGER NOT NULL,
             end INTEGER NOT NULL,
             location TEXT NOT NULL,
@@ -131,6 +146,17 @@ class AppDb {
             created INTEGER NOT NULL,
             FOREIGN KEY(groupId) REFERENCES groups(id) ON DELETE CASCADE,
             FOREIGN KEY(creatorId) REFERENCES users(id) ON DELETE CASCADE
+          );
+        ''');
+
+        await d.execute('''
+          CREATE TABLE session_members(
+            userId INTEGER NOT NULL,
+            sessionId INTEGER NOT NULL,
+            joinedAt INTEGER NOT NULL,
+            PRIMARY KEY(userId, sessionId),
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(sessionId) REFERENCES sessions(id) ON DELETE CASCADE
           );
         ''');
 
@@ -164,7 +190,22 @@ class AppDb {
             FOREIGN KEY(creatorId) REFERENCES users(id) ON DELETE CASCADE
           );
         ''');
-      // },
+
+
+        await d.execute('''
+          CREATE TABLE notifications(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            userId INTEGER NOT NULL,
+            groupId INTEGER NOT NULL,
+            messageId INTEGER NOT NULL,
+            created INTEGER NOT NULL,
+            read INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(groupId) REFERENCES groups(id) ON DELETE CASCADE,
+            FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE
+          );
+        ''');
+      
 
 
         // DEMO SEED DATA (just for example visuals, remove later)
@@ -227,10 +268,10 @@ class AppDb {
           'created': ms(now.subtract(const Duration(days: 6))),
         });
 
-        // Sessions for Calculus group
         final calcSess1Id = await d.insert('sessions', {
           'groupId': calcGroupId,
           'title': 'Limit Laws Deep Dive',
+          'description': 'In-depth exploration of limit laws and their applications',
           'start': ms(now.add(const Duration(days: 1, hours: 17))),
           'end': ms(now.add(const Duration(days: 1, hours: 19))),
           'location': 'Library 2nd Floor - Table 4',
@@ -243,6 +284,7 @@ class AppDb {
         await d.insert('sessions', {
           'groupId': calcGroupId,
           'title': 'Derivatives Practice Marathon',
+          'description': 'Long practice session with worked examples and problem solving',
           'start': ms(now.add(const Duration(days: 3, hours: 18))),
           'end': ms(now.add(const Duration(days: 3, hours: 20))),
           'location': 'Library 1st Floor - Study Room A',
@@ -252,10 +294,10 @@ class AppDb {
           'created': ms(now),
         });
 
-        // Sessions for CS group
         final csSess1Id = await d.insert('sessions', {
           'groupId': csGroupId,
           'title': 'Pointers & Memory Basics',
+          'description': 'Beginner-friendly introduction to pointers, references, and memory allocation',
           'start': ms(now.add(const Duration(days: 2, hours: 16))),
           'end': ms(now.add(const Duration(days: 2, hours: 18))),
           'location': 'Lab B12',
@@ -265,10 +307,10 @@ class AppDb {
           'created': ms(now.subtract(const Duration(hours: 3))),
         });
 
-        // A Psych session
         final psychSess1Id = await d.insert('sessions', {
           'groupId': psychGroupId,
           'title': 'Chapter 3: Memory & Learning',
+          'description': 'Review session with Kahoot quiz covering memory and learning concepts',
           'start': ms(now.add(const Duration(days: 4, hours: 15))),
           'end': ms(now.add(const Duration(days: 4, hours: 17))),
           'location': 'Room H310',
@@ -334,7 +376,6 @@ class AppDb {
 
 
       onUpgrade: (d, oldV, newV) async {
-        // safeguard: recreate missing message table if needed
         await d.execute('CREATE TABLE IF NOT EXISTS messages('
             'id INTEGER PRIMARY KEY AUTOINCREMENT,'
             'groupId INTEGER NOT NULL,'
@@ -345,8 +386,40 @@ class AppDb {
             'FOREIGN KEY(groupId) REFERENCES groups(id) ON DELETE CASCADE,'
             'FOREIGN KEY(sessionId) REFERENCES sessions(id) ON DELETE CASCADE,'
             'FOREIGN KEY(creatorId) REFERENCES users(id) ON DELETE CASCADE'
-            ');');
+            ');'
+        );
+        await d.execute('CREATE TABLE IF NOT EXISTS group_members('
+            'userId INTEGER NOT NULL,'
+            'groupId INTEGER NOT NULL,'
+            'joinedAt INTEGER NOT NULL,'
+            'PRIMARY KEY(userId, groupId),'
+            'FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,'
+            'FOREIGN KEY(groupId) REFERENCES groups(id) ON DELETE CASCADE'
+            ');'
+        );
+        await d.execute('CREATE TABLE IF NOT EXISTS session_members('
+            'userId INTEGER NOT NULL,'
+            'sessionId INTEGER NOT NULL,'
+            'joinedAt INTEGER NOT NULL,'
+            'PRIMARY KEY(userId, sessionId),'
+            'FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,'
+            'FOREIGN KEY(sessionId) REFERENCES sessions(id) ON DELETE CASCADE'
+            ');'
+        );
+        await d.execute('CREATE TABLE IF NOT EXISTS notifications('
+            'id INTEGER PRIMARY KEY AUTOINCREMENT,'
+            'userId INTEGER NOT NULL,'
+            'groupId INTEGER NOT NULL,'
+            'messageId INTEGER NOT NULL,'
+            'created INTEGER NOT NULL,'
+            'read INTEGER NOT NULL DEFAULT 0,'
+            'FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,'
+            'FOREIGN KEY(groupId) REFERENCES groups(id) ON DELETE CASCADE,'
+            'FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE'
+            ');'
+        );
       },
+            
     );
     return _db!;
   }
@@ -465,9 +538,76 @@ class AppDb {
   */
 
   /// Fetches all groups (sorted by name)
-  Future<List<StudyGroup>> getGroups() async
+  Future<List<StudyGroup>> getGroups
+  (
+    {
+      String? text,
+      String? subject,
+      String? location,
+      String? tag,
+      int limit = 50,
+      int? beforeCreated,
+      int? afterCreated
+    }
+  ) async
   {
-    final rows = await (await db).query('groups', orderBy: 'name ASC');
+    final _db = await db;
+    final iLimit = limit <= 0 ? 50 : (limit > 200 ? 200 : limit);
+
+    final whereParts = <String>[];
+    final whereArgs = <Object>[];
+
+    if (text != null && text.trim().isNotEmpty) 
+    {
+      final like = '%${text.trim()}%';
+      whereParts.add
+      (
+        '(name LIKE ? OR '
+        'description LIKE ? OR '
+        'subject LIKE ? OR '
+        'location LIKE ? OR '
+        'tags LIKE ?)',
+      );
+      whereArgs.addAll([like, like, like, like, like]);
+    }
+    // Subject
+    if (subject != null && subject.trim().isNotEmpty)
+    {
+      whereParts.add('subject LIKE ?');
+      whereArgs.add('%${subject.trim()}%');
+    }
+    // Location
+    if (location != null && location.trim().isNotEmpty)
+    {
+      whereParts.add('location LIKE ?');
+      whereArgs.add('%${location.trim()}%');
+    }
+    // Tag
+    if (tag != null && tag.trim().isNotEmpty)
+    {
+      whereParts.add('tags LIKE ?');
+      whereArgs.add('%${tag.trim()}%');
+    }
+    if (beforeCreated != null)
+    {
+      whereParts.add('created < ?');
+      whereArgs.add(beforeCreated);
+    }
+    if (afterCreated != null)
+    {
+      whereParts.add('created > ?');
+      whereArgs.add(afterCreated);
+    }
+
+    final rows = await _db.query
+    (
+      'groups',
+      where: whereParts.isEmpty ? null : whereParts.join(' AND '),
+      whereArgs: whereParts.isEmpty ? null : whereArgs,
+      orderBy: 'created DESC, name ASC',
+      limit: iLimit,
+    );
+
     return rows.map(StudyGroup.fromMap).toList();
   }
 
@@ -518,10 +658,33 @@ class AppDb {
   );
   }
 
-  Future<void> setJoined(int userId, int groupId, bool joined) async
+  Future<void> setJoinedGroup(int userId, int groupId, bool joined) async
   {
-    // todo
-    return;
+    final db_ = await db;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    if (joined == true)
+    {
+      await db_.insert
+      (
+        'group_members',
+        {
+          'userId': userId,
+          'groupId': groupId,
+          'joinedAt': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    else
+    {
+      await db_.delete
+      (
+        'group_members',
+        where: 'userId = ? AND groupId = ?',
+        whereArgs: [userId, groupId],
+      );
+    }
   }
 
   /// Deletes a group by ID
@@ -537,14 +700,72 @@ class AppDb {
   */
 
   /// Returns all sessions belonging to a specific group
-  Future<List<StudySession>> getSessionsForGroup(int groupId) async
+  Future<List<StudySession>> getSessionsForGroup
+  (
+    int groupId,
+    {
+      String? text,
+      String? location,
+      int? startFromMs,
+      int? startToMs,
+      int? endFromMs,
+      int? endToMs,
+      int limit = 50,
+    }
+  ) async
   {
-    final rows = await (await db).query(
+    final _db = await db;
+
+    final iLimit = limit <= 0 ? 50 : (limit > 100 ? 100 : limit);
+
+    final whereParts = <String>['groupId = ?'];
+    final whereArgs = <Object>[groupId];
+
+    // generic search
+    if (text != null && text.trim().isNotEmpty)
+    {
+      final like = '%${text.trim()}%';
+      whereParts.add('(title like ? OR description like ?)');
+      whereArgs.addAll([like, like]);
+    }
+    // location
+    if (location != null && location.trim().isNotEmpty)
+    {
+      whereParts.add('location LIKE ?');
+      whereArgs.add('%${location.trim()}%');
+    }
+    // start time
+    if (startFromMs != null)
+    {
+      whereParts.add('start >= ?');
+      whereArgs.add(startFromMs);
+    }
+    if (startToMs != null)
+    {
+      whereParts.add('start <= ?');
+      whereArgs.add(startToMs);
+    }
+    // end time
+    if (endFromMs != null)
+    {
+      whereParts.add('end >= ?');
+      whereArgs.add(endFromMs);
+    }
+    if (endToMs != null)
+    {
+      whereParts.add('end <= ?');
+      whereArgs.add(endToMs);
+    }
+
+    final rows = await _db.query
+    (
       'sessions',
-      where: 'groupId=?',
-      whereArgs: [groupId],
-      orderBy: 'start ASC',
+      where: whereParts.join(' AND '),
+      whereArgs: whereArgs,
+      orderBy: 'start ASC, title ASC',
+      limit: iLimit,
     );
+
     return rows.map(StudySession.fromMap).toList();
   }
 
@@ -575,6 +796,52 @@ class AppDb {
     dbInst.insert('sessions', map);
   }
 
+  Future<void> setJoinedSession(int userId, int sessionId, bool joined) async
+  {
+    final db_ = await db;
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    if (joined == true)
+    {
+      // add session membership
+      final inserted = await db_.insert
+      (
+        'session_members',
+        {
+          'userId': userId,
+          'sessionId': sessionId,
+          'joinedAt': now
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore
+      );
+      if (inserted != 0)
+      {
+        await db_.rawUpdate('UPDATE sessions SET attendees = attendees + 1 WHERE id = ?',[sessionId]);
+      }
+    }
+    else
+    {
+      // remove session membership
+      final deleted = await db_.delete
+      (
+        'session_members',
+        where: 'userId = ? AND sessionId = ?',
+        whereArgs: [userId, sessionId],
+      );
+
+      if (deleted > 0)
+      {
+        await db_.rawUpdate
+        (
+          'UPDATE sessions '
+          'SET attendees = CASE WHEN attendees > 0 THEN attendees - 1 ELSE 0 END '
+          'WHERE id = ?',
+          [sessionId],
+        );
+      }
+    }
+  }
+
   /// Deletes a specific session
   Future<void> deleteSession(int id) async
   {
@@ -595,16 +862,69 @@ class AppDb {
     Messages
   */
 
-  /// Loads all messages for a specific group (oldest → newest)
-  Future<List<ChatMessage>> getMessages(int groupId) async
+  /// Loads all messages
+  Future<List<ChatMessage>> getMessages(
+    int groupId,
+    {
+      int limit = 50,
+      int? beforeMs,
+      int? afterMs,
+      String? text,
+      int? sessionId,
+      int? creatorId
+    }
+  ) async
   {
-    final rows = await (await db).query(
+    final db_ = await db;
+
+    final iLimit =limit <= 0 ? 50 : (limit > 200 ? 200 : limit);
+
+    final whereParts = <String>['groupId = ?'];
+    final whereArgs = <Object>[groupId];
+
+    // session filter
+    if (sessionId != null)
+    {
+      whereParts.add('sessionId = ?');
+      whereArgs.add(sessionId);
+    }
+
+    // creator filter
+    if (creatorId != null)
+    {
+      whereParts.add('creatorId = ?');
+      whereArgs.add(creatorId);
+    }
+
+    // time filters
+    if (beforeMs != null)
+    {
+      whereParts.add('date < ?');
+      whereArgs.add(beforeMs);
+    }
+    if (afterMs != null)
+    {
+      whereParts.add('date > ?');
+      whereArgs.add(afterMs);
+    }
+
+    // message context search
+    if (text != null && text.trim().isNotEmpty)
+    {
+      whereParts.add('text LIKE ?');
+      whereArgs.add('%${text.trim()}%');
+    }
+
+    final rows = await db_.query
+    (
       'messages',
-      where: 'groupId=?',
-      whereArgs: [groupId],
-      orderBy: 'date ASC',
+      where: whereParts.join(' AND '),
+      whereArgs: whereArgs,
+      orderBy: 'date DESC',
+      limit: iLimit,
     );
-    return rows.map(ChatMessage.fromMap).toList();
+
+    return rows.reversed.map(ChatMessage.fromMap).toList();
   }
 
   // Fetches group given by id
@@ -622,7 +942,7 @@ class AppDb {
   }
 
   /// Adds a new chat message
-  Future<void> addMessage(ChatMessage m) async
+  Future<int> addMessage(ChatMessage m) async
   {
 
     final dbInst = await db;
@@ -632,7 +952,8 @@ class AppDb {
       ..remove('id')
       ..['date'] = now;
 
-    dbInst.insert('messages', map);
+    final id = dbInst.insert('messages', map);
+    return id;
   }
 
   /// Deletes a chat message by ID
@@ -640,4 +961,104 @@ class AppDb {
   {
     (await db).delete('messages', where: 'id=?', whereArgs: [id]);
   }
+
+  /*
+    Notifications
+  */
+    Future<void> insertNotificationsForNewMessage
+    (
+    int groupId,
+    int messageId,
+    int creatorId
+    ) async
+    {
+    final db_ = await db;
+
+    // gather group members
+    final members = await db_.query
+    (
+      'group_members',
+      columns: ['userId'],
+      where: 'groupId = ?',
+      whereArgs: [groupId]
+    );
+
+    if (members.isEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    for (final row in members)
+    {
+      final userId = row['userId'] as int;
+      if (userId == creatorId) continue; // dont notify the creator of the message
+
+      await db_.insert('notifications',
+        {
+          'userId': userId,
+          'groupId': groupId,
+          'messageId': messageId,
+          'created': now,
+          'read': 0
+        }
+      );
+    }
+  }
+
+  Future<List<Map<String, Object?>>> getUnreadNotificationsForUser
+  (
+    int userId,
+    {
+    int? sinceMs,
+    int limit = 50
+    }
+  ) async {
+    final db_ = await db;
+
+    final whereArgs = <Object>[userId];
+    final whereExtra = <String>[];
+
+    if (sinceMs != null) {
+      whereExtra.add('n.created > ?');
+      whereArgs.add(sinceMs);
+    }
+
+    final whereClause = [
+      'n.userId = ?',
+      'n.read = 0',
+      ...whereExtra
+    ].join(' AND ');
+
+    final sql = '''
+      SELECT
+        n.id AS notifId,
+        n.created AS notifCreated,
+        m.id AS messageId,
+        m.text AS messageText,
+        m.date AS messageDate,
+        g.id AS groupId,
+        g.name AS groupName
+      FROM notifications n
+      JOIN messages m ON m.id = n.messageId
+      JOIN groups g   ON g.id = n.groupId
+      WHERE $whereClause
+      ORDER BY n.created DESC
+      LIMIT ?
+    ''';
+
+    whereArgs.add(limit);
+
+    final rows = await db_.rawQuery(sql, whereArgs);
+    return rows;
+  }
+
+  Future<void> markNotificationsAsRead(List<int> notifIds) async
+  {
+    if (notifIds.isEmpty) return;
+    final db_ = await db;
+
+    final placeholders = List.filled(notifIds.length, '?').join(',');
+    await db_.rawUpdate('UPDATE notifications SET read = 1 WHERE id IN ($placeholders)',notifIds);
+  }
+
+
 }

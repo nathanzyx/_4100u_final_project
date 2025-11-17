@@ -3,6 +3,7 @@ class StudySession {
   final int? id;              // Database ID (auto-incremented)
   final int groupId;          // ID of the parent study group
   final String title;         // Session topic or title
+  final String description;     // Description of the session
   final DateTime start;       // Start time/date of the session
   final DateTime end;         // End time/date of the session
   final String location;      // Where the session will be held
@@ -15,6 +16,7 @@ class StudySession {
     this.id,
     required this.groupId,
     required this.title,
+    required this.description,
     required this.start,
     required this.end,
     required this.location,
@@ -29,6 +31,7 @@ class StudySession {
     'id': id,
     'groupId': groupId,
     'title': title,
+    'description': description,
     'start': start.millisecondsSinceEpoch,
     'end': end.millisecondsSinceEpoch,
     'location': location,
@@ -43,6 +46,7 @@ class StudySession {
     id: m['id'] as int?,
     groupId: m['groupId'] as int,
     title: m['title'] as String,
+    description: (m['description'] as String?) ?? '',
     start: DateTime.fromMillisecondsSinceEpoch(m['start'] as int),
     end: DateTime.fromMillisecondsSinceEpoch(m['end'] as int),
     location: m['location'] as String,

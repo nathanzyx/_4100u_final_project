@@ -28,12 +28,14 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _client.startNotificationPolling(); // begin polling for notifications
     _load(); // fetch groups and daily tip
   }
 
   /// Loads study groups and the daily tip
   Future<void> _load() async {
-    final g = await _client.getGroups();
+    final q = _search.text.trim();
+    final g = await _client.getGroups(query: q.isEmpty ? null : q);
     final tip = await TipsService.fetchDailyTip();
     setState(() {
       _groups = g;
@@ -83,7 +85,7 @@ class _HomePageState extends State<HomePage> {
         hintText: 'Search study groups...',
         border: OutlineInputBorder(),
       ),
-      onChanged: (_) => setState(() {}), // updates filter on text change
+      onChanged: (_) {_load();},
     );
   }
 

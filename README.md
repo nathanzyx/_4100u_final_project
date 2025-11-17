@@ -38,6 +38,8 @@ Each group member constributed the following
         - `app_notifier.dart` (*created base app notification system*)
     - **Server** `study_connect_server/`
         - `database.dart` (*updated SQL definitions, created database API methods*)
+    - **Notifications** `lib/client/`
+        - `notification_service.dart` (*created base notification service for the client*)
 - **Data Classes** (`study_connect_shared/lib/models/`)
     - `user.dart` (*created user data model*)
 - **App QOL**
