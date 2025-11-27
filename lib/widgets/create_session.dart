@@ -1,209 +1,196 @@
 import 'package:flutter/material.dart';
-import 'package:study_connect_shared/models/session.dart';
 
-// Dialog for creating a new StudySession
-// - Collects title, date, start/end times, location, and capacity
-// - Returns a StudySession to the caller via Navigator.pop(...)
+/// Simple data object we return from the dialog.
+/// GroupDetailsPage uses this to show the session.
+class SessionInfo {
+  final String title;
+  final String? location;
+  final DateTime? startDateTime;
+  final DateTime? endDateTime;
+
+  SessionInfo({
+    required this.title,
+    this.location,
+    this.startDateTime,
+    this.endDateTime,
+  });
+}
+
+/// Dialog to create a new study session for a group.
 class CreateSessionDialog extends StatefulWidget {
-  final int groupId;
-  const CreateSessionDialog({super.key, required this.groupId});
+  const CreateSessionDialog({super.key});
 
   @override
   State<CreateSessionDialog> createState() => _CreateSessionDialogState();
 }
 
 class _CreateSessionDialogState extends State<CreateSessionDialog> {
-  // Text controllers for inputs
-  final _title = TextEditingController();
-  final _description = TextEditingController();
-  final _location = TextEditingController();
-  final _max = TextEditingController(text: '12');
+  final _formKey = GlobalKey<FormState>();
+  final _titleCtrl = TextEditingController();
+  final _locationCtrl = TextEditingController();
 
-  // Date/Time selections (picked with material pickers)
-  DateTime? _date;
-  TimeOfDay? _start;
-  TimeOfDay? _end;
+  DateTime? _pickedDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
 
-  // ----------------------- pickers -----------------------
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _locationCtrl.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime d) {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final wd = weekdays[d.weekday - 1];
+    final m = months[d.month - 1];
+    return '$wd, $m ${d.day}, ${d.year}';
+  }
+
+  DateTime _combine(DateTime date, TimeOfDay tod) {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      tod.hour,
+      tod.minute,
+    );
+  }
 
   Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final d = await showDatePicker(
+    final today = DateTime.now();
+    final result = await showDatePicker(
       context: context,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-      initialDate: now,
+      initialDate: _pickedDate ?? today,
+      firstDate: today.subtract(const Duration(days: 1)),
+      lastDate: today.add(const Duration(days: 365)),
     );
-    if (d != null) setState(() => _date = d);
+    if (result != null) {
+      setState(() => _pickedDate = result);
+    }
   }
 
-  Future<void> _pickStart() async {
-    final t = await showTimePicker(
+  Future<void> _pickStartTime() async {
+    final result = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(hour: 18, minute: 0),
+      initialTime: _startTime ?? TimeOfDay.now(),
     );
-    if (t != null) setState(() => _start = t);
+    if (result != null) {
+      setState(() => _startTime = result);
+    }
   }
 
-  Future<void> _pickEnd() async {
-    final t = await showTimePicker(
+  Future<void> _pickEndTime() async {
+    final result = await showTimePicker(
       context: context,
-      initialTime: const TimeOfDay(hour: 20, minute: 0),
+      initialTime: _endTime ?? (_startTime ?? TimeOfDay.now()),
     );
-    if (t != null) setState(() => _end = t);
+    if (result != null) {
+      setState(() => _endTime = result);
+    }
   }
-
-  // ----------------------- helpers -----------------------
-
-  /// Combines selected date and time into a DateTime
-  DateTime _merge(DateTime d, TimeOfDay t) =>
-      DateTime(d.year, d.month, d.day, t.hour, t.minute);
-
-  /// Formats the chosen date as YYYY-MM-DD for the button label
-  String _dateLabel() => _date == null
-      ? 'Select date *'
-      : _date!.toLocal().toString().split(' ').first;
-
-  /// Returns a label for a time button, or placeholder if null
-  String _timeLabel(TimeOfDay? t, String placeholder) =>
-      t == null ? placeholder : t.format(context);
-
-  // ----------------------- save -----------------------
 
   void _save() {
-    // Basic required-field validation
-    if (_title.text.isEmpty ||
-        _date == null ||
-        _start == null ||
-        _end == null ||
-        _location.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete all fields')),
-      );
-      return;
+    if (!_formKey.currentState!.validate()) return;
+
+    DateTime? start;
+    DateTime? end;
+
+    if (_pickedDate != null && _startTime != null) {
+      start = _combine(_pickedDate!, _startTime!);
+    }
+    if (_pickedDate != null && _endTime != null) {
+      end = _combine(_pickedDate!, _endTime!);
     }
 
-    // Construct start/end DateTime from date + time
-    final start = _merge(_date!, _start!);
-    final end = _merge(_date!, _end!);
-
-    // Ensure end is after start (simple sanity check)
-    if (!end.isAfter(start)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('End time must be after start time')),
-      );
-      return;
-    }
-
-    // Parse capacity (fallback to 12 if invalid)
-    final capacity = int.tryParse(_max.text.trim()) ?? 12;
-
-    // Build the StudySession and return it to the caller
-    final s = StudySession(
-      groupId: widget.groupId,
-      title: _title.text.trim(),
-      description: _description.text.trim(),
-      start: start,
-      end: end,
-      location: _location.text.trim(),
-      maxAttendees: capacity,
+    final info = SessionInfo(
+      title: _titleCtrl.text.trim(),
+      location: _locationCtrl.text.trim().isEmpty
+          ? null
+          : _locationCtrl.text.trim(),
+      startDateTime: start,
+      endDateTime: end,
     );
-    Navigator.pop(context, s);
-  }
 
-  // ----------------------- UI -----------------------
+    Navigator.of(context).pop(info);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
+    return AlertDialog(
+      title: const Text('Create session'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Title
-              const Text(
-                'Create New Study Session',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-
               // Session title
-              TextField(
-                controller: _title,
-                decoration: const InputDecoration(labelText: 'Session Title *'),
-              ),
-              const SizedBox(height: 8),
-
-              // Date picker
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _pickDate,
-                      icon: const Icon(Icons.event),
-                      label: Text(_dateLabel()),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Start/End time pickers
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _pickStart,
-                      icon: const Icon(Icons.schedule),
-                      label: Text(_timeLabel(_start, 'Start time *')),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _pickEnd,
-                      icon: const Icon(Icons.schedule),
-                      label: Text(_timeLabel(_end, 'End time *')),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Location + capacity
-              TextField(
-                controller: _location,
+              TextFormField(
+                controller: _titleCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Location *',
-                  hintText: 'e.g., Library Room 204',
+                  labelText: 'Session title',
                 ),
-              ),
-              const SizedBox(height: 8),
-
-              TextField(
-                controller: _max,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Maximum Attendees',
-                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a title';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 12),
 
-              // Actions
+              // Location / room
+              TextFormField(
+                controller: _locationCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Location (Room)',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Date button – full width
+              OutlinedButton.icon(
+                onPressed: _pickDate,
+                icon: const Icon(Icons.calendar_today),
+                label: Text(
+                  _pickedDate == null
+                      ? 'Pick date'
+                      : _formatDate(_pickedDate!),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Start / End time aligned in one row
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickStartTime,
+                      icon: const Icon(Icons.schedule),
+                      label: Text(
+                        _startTime == null
+                            ? 'Start time'
+                            : _startTime!.format(context),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.check),
-                    label: const Text('Create Session'),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickEndTime,
+                      icon: const Icon(Icons.schedule_outlined),
+                      label: Text(
+                        _endTime == null
+                            ? 'End time'
+                            : _endTime!.format(context),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -211,6 +198,16 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
           ),
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

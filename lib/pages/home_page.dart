@@ -3,6 +3,7 @@ import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect/pages/group_details_page.dart';
 import 'package:study_connect/services/tips.dart';
 import 'package:study_connect/widgets/create_group.dart';
+import 'package:study_connect/pages/settings_page.dart'; // settings screen
 import '../services/client/client_services.dart';
 
 // Home screen of StudyConnect:
@@ -11,7 +12,17 @@ import '../services/client/client_services.dart';
 // - Displays all groups with swipe-to-delete
 // - Adds new groups via a floating button
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  // Whether dark mode is currently on or off (comes from main.dart)
+  final bool darkModeEnabled;
+
+  // Callback to tell main.dart that the theme switch changed
+  final ValueChanged<bool> onThemeChanged;
+
+  const HomePage({
+    super.key,
+    required this.darkModeEnabled,
+    required this.onThemeChanged,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -85,7 +96,9 @@ class _HomePageState extends State<HomePage> {
         hintText: 'Search study groups...',
         border: OutlineInputBorder(),
       ),
-      onChanged: (_) {_load();},
+      onChanged: (_) {
+        _load();
+      },
     );
   }
 
@@ -167,7 +180,29 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('StudyConnect')),
+      appBar: AppBar(
+        title: const Text('StudyConnect'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () {
+              // Open the Settings screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SettingsPage(
+                    // pass the real dark-mode flag from main.dart
+                    darkModeEnabled: widget.darkModeEnabled,
+                    // when the user changes the switch, tell main.dart
+                    onThemeChanged: widget.onThemeChanged,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createGroup,
         icon: const Icon(Icons.group_add),

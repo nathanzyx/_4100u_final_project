@@ -5,6 +5,7 @@ import 'package:study_connect_shared/models/session.dart';
 import 'package:study_connect_shared/models/chat_message.dart';
 import '../services/client/client_services.dart';
 import '../services/app_notifier.dart';
+import '../group_joined_extension.dart';  // small helper so we can use group.joined
 
 // Per-group local chat screen (SQLite-backed)
 class ChatPage extends StatefulWidget {
@@ -17,12 +18,12 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final _client = ClientService();
-  final _inputCtrl = TextEditingController();         // message composer
+  final _inputCtrl = TextEditingController(); // message composer
 
   // final _displayNameCtrl = TextEditingController(
   //   text: 'You',
   // ); // simple local display name
-  List<ChatMessage> _messages = [];                   // loaded from DB
+  List<ChatMessage> _messages = []; // loaded from DB
 
   @override
   void initState() {
@@ -30,6 +31,7 @@ class _ChatPageState extends State<ChatPage> {
     _loadMessages();
   }
 
+  // old helper – not used anymore, but kept in case you want a separate init
   Future<void> _init() async {
     final msgs = await _client.getMessages(widget.group.id!);
 
@@ -77,7 +79,8 @@ class _ChatPageState extends State<ChatPage> {
 
     final bool isMine = (currentUserId != null && m.creatorId == currentUserId);
     final align = isMine ? Alignment.centerRight : Alignment.centerLeft;
-    final authorLabel = isMine ? 'You' : (m.creatorId != null ? 'User ${m.creatorId}' : 'Unknown');
+    final authorLabel =
+    isMine ? 'You' : (m.creatorId != null ? 'User ${m.creatorId}' : 'Unknown');
 
     return Align(
       alignment: align,
@@ -101,18 +104,57 @@ class _ChatPageState extends State<ChatPage> {
             Text(m.text),
             const SizedBox(height: 2),
             // timestamp
-            Text(
-              _formatTs(m.date!),
-              style: const TextStyle(fontSize: 11, color: Colors.black54),
-            ),
+            if (m.date != null)
+              Text(
+                _formatTs(m.date!),
+                style: const TextStyle(fontSize: 11, color: Colors.black54),
+              ),
           ],
         ),
       ),
     );
   }
 
+  /// Little info bar if the user is not joined (future-proof – for now joined is always true)
+  Widget _buildJoinWarning() {
+    final joined = widget.group.joined;
+    if (joined) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      color: Colors.amber.withOpacity(0.15),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: const Text(
+        'You are not joined to this group. Join it to start chatting.',
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
   /// Message composer row (TextField + Send button)
   Widget _buildComposer() {
+    final joined = widget.group.joined;
+
+    // If not joined, show a disabled composer with a hint.
+    if (!joined) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Row(
+            children: const [
+              Expanded(
+                child: Text(
+                  'Join this group to send messages.',
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Normal composer when joined
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -146,14 +188,25 @@ class _ChatPageState extends State<ChatPage> {
       appBar: AppBar(title: Text('Chat • ${widget.group.name}')),
       body: Column(
         children: [
+          // join info bar (right now it will be hidden, because joined is always true)
+          _buildJoinWarning(),
+
           // messages list
           Expanded(
-            child: ListView.builder(
+            child: _messages.isEmpty
+                ? const Center(
+              child: Text(
+                'No messages yet. Say hi 👋',
+                style: TextStyle(color: Colors.black54),
+              ),
+            )
+                : ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: _messages.length,
               itemBuilder: (_, i) => _buildMessageBubble(_messages[i]),
             ),
           ),
+
           // composer
           _buildComposer(),
         ],

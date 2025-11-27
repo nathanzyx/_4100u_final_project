@@ -1,46 +1,34 @@
 import 'package:flutter/material.dart';
 
-
-/*
-
-  AppNotifier
-
-  - simple class (for now) for showing notifications
-
-  - When we implement the server, this will be more thouroughly used
-
-*/
+/// Small helper for showing in-app messages.
+/// We also use a flag so the Settings page can turn them on or off.
 class AppNotifier {
-  AppNotifier._();
+  // When this is false, we do not show any SnackBars.
+  static bool notificationsEnabled = true;
 
-  // allow custom notifications for banner
   static void show(
-    BuildContext context, {
-    required String message,
-    IconData icon = Icons.notifications,
-  }) {
-    final messenger = ScaffoldMessenger.of(context);
+      BuildContext context, {
+        required String message,
+        IconData? icon,
+      }) {
+    // Respect the settings toggle
+    if (!notificationsEnabled) return;
 
-    // interrupt other banners (if applicable)
-    messenger.hideCurrentMaterialBanner();
+    final theme = Theme.of(context);
 
-    messenger.showMaterialBanner(
-      MaterialBanner
-      (
-        content: Text(message),
-        leading: Icon(icon),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-        // button to get rid of the notification
-        actions: [
-          TextButton(
-            onPressed: messenger.hideCurrentMaterialBanner,
-            child: const Text('Dismiss'),
-          ),
-
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: theme.colorScheme.onPrimary),
+              const SizedBox(width: 8),
+            ],
+            Expanded(child: Text(message)),
+          ],
+        ),
       ),
-
     );
   }
 }
