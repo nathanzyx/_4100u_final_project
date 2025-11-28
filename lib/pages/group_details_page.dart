@@ -29,6 +29,8 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   final List<SessionInfo> _sessions = [];
   bool _loadingSessions = false;
 
+  bool _isMember = false; 
+
   @override
   void initState() {
     super.initState();
@@ -85,15 +87,50 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     );
   }
 
+  //  JOIN FUNCTION
+  Future<void> _joinGroup() async {
+    setState(() => _isMember = true);
+    AppNotifier.show(
+      context,
+      message: 'Joined ${widget.group.name}',
+      icon: Icons.check,
+    );
+  }
+
+  //  LEAVE FUNCTION
+  Future<void> _leaveGroup() async {
+    setState(() => _isMember = false);
+    AppNotifier.show(
+      context,
+      message: 'Left ${widget.group.name}',
+      icon: Icons.logout,
+    );
+  }
+
   /// Nice little banner at the top to show membership.
   Widget _buildMemberBanner() {
+    if (_isMember) { // <-- NEW
+      return Container(
+        width: double.infinity,
+        color: Colors.green.shade700,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: const Center(
+          child: Text(
+            'You are a member of this group.',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
+
+    // <-- NEW: NOT A MEMBER BANNER
     return Container(
       width: double.infinity,
-      color: Colors.green.shade700,
+      color: Colors.orange.shade700,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: const Center(
         child: Text(
-          'You are a member of this group.',
+          'You are not a member of this group.',
           style: TextStyle(color: Colors.white),
         ),
       ),
@@ -168,7 +205,6 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   }
 
   /// Formats date + time range for a session.
-  /// Example: "Tue, Nov 25, 2025 • 14:00 → 16:00"
   String _formatSession(SessionInfo s) {
     if (s.startDateTime == null) return '';
 
@@ -251,7 +287,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         ),
         const SizedBox(height: 4),
         ..._sessions.map(_buildSessionCard),
-        const SizedBox(height: 80), // space above the FAB / bottom bar
+        const SizedBox(height: 80),
       ],
     );
   }
@@ -262,11 +298,15 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       appBar: AppBar(
         title: Text(widget.group.name),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createSession,
-        icon: const Icon(Icons.add),
-        label: const Text('Create session'),
-      ),
+
+      floatingActionButton: _isMember 
+          ? FloatingActionButton.extended(
+              onPressed: _createSession,
+              icon: const Icon(Icons.add),
+              label: const Text('Create session'),
+            )
+          : null, 
+
       body: Column(
         children: [
           _buildMemberBanner(),
@@ -275,7 +315,20 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
               child: Column(
                 children: [
                   _buildGroupHeaderCard(),
+
+                  // NEW JOIN/LEAVE BUTTON
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _isMember ? _leaveGroup : _joinGroup,
+                        child: Text(_isMember ? "Leave group" : "Join group"),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 8),
+
                   _buildSessionsSection(),
                 ],
               ),
@@ -285,16 +338,18 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       ),
 
       // Big "Open chat" button pinned to the bottom.
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: FilledButton.icon(
-            onPressed: _openChat,
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('Open chat'),
-          ),
-        ),
-      ),
+      bottomNavigationBar: _isMember // <-- NEW
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: FilledButton.icon(
+                  onPressed: _openChat,
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text('Open chat'),
+                ),
+              ),
+            )
+          : null,
     );
   }
 }
