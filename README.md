@@ -91,4 +91,20 @@ Each group member constributed the following
         - `database.dart` (*bug fix*)
 
 ### **Myron Lobo - Contributions**
+**Created**
+- **Frontend**
+    - **Membership System** (`lib/pages/`)
+        - `group_details_page.dart` (*added full join/leave group system, dynamic membership banner, conditional UI elements*)
+    - **Session Membership Design** (`lib/pages/`)
+        - `group_details_page.dart` (*planned structure for join/leave session UI and logic*)
+- **Project Structure & Documentation**
+    - (*improved documentation consistency and supported frontend organization*)
 
+**Modified**
+- **Frontend** (`lib/pages/`)
+    - `group_details_page.dart` (*membership logic, UI updates, conditional FAB and chat visibility*)
+    - `home_page.dart` (*UI behavior adjustments related to membership flow*)
+       chat_page.dart` (*minor UI/usability improvements*)
+- **Widgets** (`lib/widgets/`)
+    - `create_session.dart` (*integration updates with session list*)
+    - `create_group.dart` (*minor consistency fixes*)
