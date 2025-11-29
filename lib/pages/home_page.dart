@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect/pages/group_details_page.dart';
 import 'package:study_connect/services/tips.dart';
 import 'package:study_connect/widgets/create_group.dart';
 import 'package:study_connect/pages/settings_page.dart'; // settings screen
+import 'package:study_connect/widgets/location_picker.dart';
 import '../services/client/client_services.dart';
 
 // Home screen of StudyConnect:
@@ -36,11 +39,33 @@ class _HomePageState extends State<HomePage> {
   List<StudyGroup> _groups = [];           // loaded list of groups
   String _tip = 'Loading tip...';          // motivational tip text
 
+  LatLng? selectedLocation;                // Store selected location from location picker dialog
+
   @override
   void initState() {
     super.initState();
     _client.startNotificationPolling(); // begin polling for notifications
     _load(); // fetch groups and daily tip
+    _getLocation(); // get user location
+  }
+
+  // Prompts user to choose their location on an interactive map
+  Future<void> _getLocation() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Shows the location picker dialog and gets the selected location
+      final LatLng? location = await showDialog<LatLng>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => LocationPickerDialog(),
+      );
+
+      // Update the selected location
+      if (location != null) {
+        setState(() {
+          selectedLocation = location;
+        });
+      }
+    });
   }
 
   /// Loads study groups and the daily tip

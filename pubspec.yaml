@@ -38,7 +38,7 @@ dependencies:
   # ---------------------------------------------
   # Added dependencies for StudyConnect project
   # ---------------------------------------------
-  sqflite: ^2.3.3   # Local database for storing sessions/groups
+  sqflite: ^2.4.2   # Local database for storing sessions/groups
   path: ^1.9.0       # Helps sqflite locate the correct database path
   http: ^1.2.2       # Used for fetching daily study tips from an API
   # ---------------------------------------------
@@ -54,6 +54,10 @@ dependencies:
 
   # for notifications
   flutter_local_notifications: ^19.5.0
+
+  # Required for location picker
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:
