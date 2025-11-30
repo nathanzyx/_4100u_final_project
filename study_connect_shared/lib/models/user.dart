@@ -5,6 +5,8 @@ class User {
   final String username;
   final String password;
   final String authToken;
+  final double latitude;
+  final double longitude;
   final int created; // Account creation timestamp
 
   User({
@@ -13,6 +15,8 @@ class User {
     required this.username,
     required this.password,
     required this.authToken,
+    required this.latitude,
+    required this.longitude,
     required this.created,
   });
 
@@ -23,6 +27,8 @@ class User {
     'username': username,
     'password': password,
     'authToken': authToken,
+    'latitude': latitude,
+    'longitude': longitude,
     'created': created,
   };
 
@@ -33,6 +39,8 @@ class User {
     username: m['username'] as String,
     password: m['password'] as String,
     authToken: m['authToken'] as String,
+    latitude: m['latitude'] as double,
+    longitude: m['longitude'] as double,
     created: m['created'] as int,
   );
 }

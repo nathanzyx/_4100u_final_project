@@ -11,7 +11,10 @@ class LocationPickerDialog extends StatefulWidget {
 }
 
 class _LocationPickerDialogState extends State<LocationPickerDialog> {
-  LatLng? selectedLocation;
+  final MapController _mapController = MapController();
+
+  LatLng? _selectedLocation;
+  double _zoom = 12;
 
   @override
   Widget build(BuildContext context) {
@@ -32,15 +35,16 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
             ),
             Expanded(
               child: FlutterMap(
+                mapController: _mapController,
                 options: MapOptions(
-                  initialCenter: LatLng(43.6532, -79.3832),
-                  initialZoom: 12,
+                  initialCenter: LatLng(43.6532, -79.3832),    // Default location (Toronto)
+                  initialZoom: _zoom,
                   interactionOptions: InteractionOptions(
                     flags: InteractiveFlag.all,    // Enables all interaction options
                   ),
                   onTap: (tapPos, location) {
                     setState(() {
-                      selectedLocation = location;
+                      _selectedLocation = location;
                     });
                   },
                 ),
@@ -51,9 +55,9 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                   ),
                   MarkerLayer(
                     markers: [
-                      if (selectedLocation != null)
+                      if (_selectedLocation != null)
                         Marker(
-                          point: selectedLocation!, 
+                          point: _selectedLocation!, 
                           child: const Icon(
                             Icons.location_pin,
                             size: 50,
@@ -66,9 +70,48 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
               ),
             ),
             SizedBox(height: 5),
-            ElevatedButton(
-              child: Text("Confirm"),
-              onPressed: () => Navigator.of(context).pop(selectedLocation),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  // Zoom buttons
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: CircleBorder(),
+                      padding: EdgeInsets.all(6),
+                      minimumSize: Size(30, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Icon(Icons.add),
+                    onPressed: () {
+                      setState(() => _zoom += 1);
+                      _mapController.move(_mapController.camera.center, _zoom);
+                    },
+                  ),
+                  SizedBox(width: 6),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: CircleBorder(),
+                      padding: EdgeInsets.all(6),
+                      minimumSize: Size(30, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Icon(Icons.remove),
+                    onPressed: () {
+                      setState(() => _zoom -= 1);
+                      _mapController.move(_mapController.camera.center, _zoom);
+                    },
+                  ),
+                  Spacer(),   // Pushes button to the right
+
+                  // Confirm button
+                  ElevatedButton(
+                    child: Text("Confirm"),
+                    onPressed: () => Navigator.of(context).pop(_selectedLocation),
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: 10),
           ],

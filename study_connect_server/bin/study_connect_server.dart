@@ -173,7 +173,7 @@ Future<void> _handleUsers
       final user = await _requireAuth(request, db);
       if (user == null) return;
 
-      // Ensure user making the call is naming themselves
+      // Ensure user making the call is changing themself
       if (user.id != id) {
         _forbidden(request);
         return;
@@ -185,9 +185,21 @@ Future<void> _handleUsers
         _badRequest(request, 'Missing request body');
         return;
       }
+
       final data = jsonDecode(body) as Map<String, dynamic>;
-      final displayName = data['displayName'] as String;
-      await db.setUserDisplayName(id, displayName);
+
+      // Set supplied values
+      if (data['displayName'] != null) {   // Update display name if supplied
+        final displayName = data['displayName'] as String;
+
+        await db.setUserDisplayName(id, displayName);
+      } else if (data['latitude'] != null && data['longitude'] != null) {   // Update coordinates if supplied
+        final latitude = data['latitude'] as double;
+        final longitude = data['longitude'] as double;
+
+        await db.setUserCoordinates(id, latitude, longitude);
+      }
+
       _json(request, {'success': 'true'});
     }
     else if (method == 'DELETE') 

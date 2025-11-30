@@ -39,7 +39,7 @@ class AppDb {
 
     _db = await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (d, v) async {
 
         /*
@@ -62,6 +62,8 @@ class AppDb {
             username TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
             authToken TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
             created INTEGER NOT NULL
           );
         ''');
@@ -218,6 +220,8 @@ class AppDb {
           'username': 'alice',
           'password': 'alicepw',
           'authToken': 'seed_alice_token',
+          'latitude': 43.6532,
+          'longitude': -79.3832,
           'created': ms(now.subtract(const Duration(days: 10))),
         });
 
@@ -226,6 +230,8 @@ class AppDb {
           'username': 'bob',
           'password': 'bobpw',
           'authToken': 'seed_bob_token',
+          'latitude': 43.6532,
+          'longitude': -79.3832,
           'created': ms(now.subtract(const Duration(days: 8))),
         });
 
@@ -234,6 +240,8 @@ class AppDb {
           'username': 'charlie',
           'password': 'charliepw',
           'authToken': 'seed_charlie_token',
+          'latitude': 43.6532,
+          'longitude': -79.3832,
           'created': ms(now.subtract(const Duration(days: 5))),
         });
 
@@ -376,6 +384,11 @@ class AppDb {
 
 
       onUpgrade: (d, oldV, newV) async {
+        if (oldV < 3) {
+          d.execute('ALTER TABLE users ADD COLUMN latitude REAL NOT NULL DEFAULT 0;');
+          d.execute('ALTER TABLE users ADD COLUMN longitude REAL NOT NULL DEFAULT 0;');
+        }
+
         await d.execute('CREATE TABLE IF NOT EXISTS messages('
             'id INTEGER PRIMARY KEY AUTOINCREMENT,'
             'groupId INTEGER NOT NULL,'
@@ -437,6 +450,8 @@ class AppDb {
     final username = 'user_${_getRandomString(10)}';
     final password = _getRandomString(10);
     final authToken = _getRandomString(50);
+    final latitude = 43.6532;
+    final longitude = -79.3832;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final id = await db_.insert('users', {
@@ -444,6 +459,8 @@ class AppDb {
         'username': username,
         'password': password,
         'authToken': authToken,
+        'latitude': latitude,
+        'longitude': longitude,
         'created': now,
     });
 
@@ -453,6 +470,8 @@ class AppDb {
       username: username,
       password: password,
       authToken: authToken,
+      latitude: latitude,
+      longitude: longitude,
       created: now
     );
   }
@@ -516,6 +535,20 @@ class AppDb {
     await db_.update(
       'users',
       {'displayName': newDisplayName},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<void> setUserCoordinates(int userId, double newLatitude, double newLongitude) async
+  {
+    final db_ = await db;
+    await db_.update(
+      'users',
+      {
+        'latitude': newLatitude,
+        'longitude': newLongitude
+      },
       where: 'id = ?',
       whereArgs: [userId],
     );

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect/pages/group_details_page.dart';
@@ -39,8 +38,6 @@ class _HomePageState extends State<HomePage> {
   List<StudyGroup> _groups = [];           // loaded list of groups
   String _tip = 'Loading tip...';          // motivational tip text
 
-  LatLng? selectedLocation;                // Store selected location from location picker dialog
-
   @override
   void initState() {
     super.initState();
@@ -59,12 +56,8 @@ class _HomePageState extends State<HomePage> {
         builder: (context) => LocationPickerDialog(),
       );
 
-      // Update the selected location
-      if (location != null) {
-        setState(() {
-          selectedLocation = location;
-        });
-      }
+      // Update the user's location 
+      if (location != null) await _client.setUserCoordinates(location.latitude, location.longitude);
     });
   }
 

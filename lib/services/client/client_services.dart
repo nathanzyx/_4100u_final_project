@@ -1,4 +1,5 @@
 // import 'package:path/path.dart';
+import 'package:path/path.dart';
 import 'package:study_connect_shared/models/user.dart';
 import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect_shared/models/session.dart';
@@ -39,6 +40,8 @@ class ClientService {
   static const _userUsernameKey = 'local_user_username';
   static const _userPasswordKey = 'local_user_password';
   static const _userAuthTokenKey = 'local_user_authToken';
+  static const _userLatitudeKey = 'local_user_latitude';
+  static const _userLongitudeKey = 'local_user_longitude';
   static const _userCreatedKey = 'local_user_created';
 
   /*
@@ -81,6 +84,8 @@ class ClientService {
     final username = l.getString(_userUsernameKey);
     final password = l.getString(_userPasswordKey);
     final authToken = l.getString(_userAuthTokenKey);
+    final latitude = l.getDouble(_userLatitudeKey);
+    final longitude = l.getDouble(_userLongitudeKey);
     final created = l.getInt(_userCreatedKey);
 
     // Expect local to hold all user data, if not, assume no user on local device (set null)
@@ -91,6 +96,8 @@ class ClientService {
       username == null ||
       password == null ||
       authToken == null ||
+      latitude == null ||
+      longitude == null ||
       created == null
     ) { return null; }
 
@@ -101,6 +108,8 @@ class ClientService {
       username: username,
       password: password,
       authToken: authToken,
+      latitude: latitude,
+      longitude: longitude,
       created: created
     );
   }
@@ -117,6 +126,8 @@ class ClientService {
     await l.setString(_userUsernameKey, user.username);
     await l.setString(_userPasswordKey, user.password);
     await l.setString(_userAuthTokenKey, user.authToken);
+    await l.setDouble(_userLatitudeKey, user.latitude);
+    await l.setDouble(_userLongitudeKey, user.longitude);
     await l.setInt(_userCreatedKey, user.created);
   }
   /*
@@ -133,6 +144,8 @@ class ClientService {
     await prefs.remove(_userUsernameKey);
     await prefs.remove(_userPasswordKey);
     await prefs.remove(_userAuthTokenKey);
+    await prefs.remove(_userLatitudeKey);
+    await prefs.remove(_userLongitudeKey);
     await prefs.remove(_userCreatedKey);
   }
   /*
@@ -268,7 +281,7 @@ class ClientService {
 
     if (result.statusCode != 200) throw Exception('Failed to rename user: ${currentUser!.id}');
 
-    // update the local user data to use the new diplay name
+    // update the local user data to use the new display name
     currentUser = User
     (
       id: currentUser!.id,
@@ -276,6 +289,45 @@ class ClientService {
       username: currentUser!.username,
       password: currentUser!.password,
       authToken: currentUser!.authToken,
+      latitude: currentUser!.latitude,
+      longitude: currentUser!.longitude,
+      created: currentUser!.created,
+    );
+  }
+  /*
+    void::setUserCoordinates(double newLatitude, double newLongitude)
+
+    calls server to set the coordinates of the current user.
+
+    - double newLatitude: new latitude of the current user.
+    - double newLongitude: new longitude of the current user.
+  */
+  Future<void> setUserCoordinates(double newLatitude, double newLongitude) async {
+    if (currentUser == null) {
+      throw Exception('No current user on this device');
+    }
+
+    final result = await _api.putJson(
+      '/users/${currentUser!.id}',
+      {
+        'latitude': newLatitude,
+        'longitude': newLongitude
+      },
+      headers: _authHeaders()
+    );
+
+    if (result.statusCode != 200) throw Exception('Failed to update user coordinates: ${currentUser!.id}');
+
+    // update the local user data to use the new coordinates
+    currentUser = User
+    (
+      id: currentUser!.id,
+      displayName: currentUser!.displayName,
+      username: currentUser!.username,
+      password: currentUser!.password,
+      authToken: currentUser!.authToken,
+      latitude: newLatitude,
+      longitude: newLongitude,
       created: currentUser!.created,
     );
   }
