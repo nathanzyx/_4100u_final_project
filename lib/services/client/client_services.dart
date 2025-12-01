@@ -10,6 +10,18 @@ import 'package:study_connect/services/notification_service.dart';
 import 'dart:async';
 
 /*
+  Helper class for cases where an account being sent with 'PUT' tries to use an existing username.
+*/
+class UsernameTakenException implements Exception
+{
+  final String message;
+  UsernameTakenException([this.message = 'Username already taken']);
+  @override
+  String toString() => message;
+}
+
+
+/*
 
   Client service for StudyConnect
 
@@ -28,11 +40,13 @@ class ClientService {
   Timer? _notificationTimer;
   int? _lastNotificationCheckMs;
 
-
-
   // local user
   User? currentUser;
   Future<User> ensureUser() => _ensureUser();
+
+  // local user location checkers (determine whether we need to prompt user to enter their location)
+  bool _createdNewInLastEnsure = false;
+  bool get createdNewInLastEnsure => _createdNewInLastEnsure;
 
   static const _userIdKey = 'local_user_id';
   static const _userDisplayNameKey = 'local_user_displayName';
@@ -42,6 +56,8 @@ class ClientService {
   static const _userLatitudeKey = 'local_user_latitude';
   static const _userLongitudeKey = 'local_user_longitude';
   static const _userCreatedKey = 'local_user_created';
+  // global app settings
+  static const _appDarkModeKey = 'app_dark_mode';
 
   /*
 
@@ -154,7 +170,8 @@ class ClientService {
   */
   Future<User> _ensureUser() async
   {
-    print("DEBUG ENSURE USER CALLED");
+    _createdNewInLastEnsure = false;
+    print("CHECKING LOCALIZED USER DATA");
     // hot-path user check first
     if (currentUser != null) {
       final refreshed = await _validateUserWithServer(currentUser!);
@@ -174,16 +191,17 @@ class ClientService {
       final refreshed = await _validateUserWithServer(localUserFromStorage);
       if (refreshed != null) 
       {
-        print("SAVED USER FROM DEVICE STORAGE");
+        print("VALID USER FOUND LOCALLY");
         currentUser = refreshed;
         await _saveLocalUserToStorage(refreshed);
         return refreshed;
       }
     }
 
-    print("LOCALIZATION FAILED, CREATING NEW USER");
+    print("NO VALID USER FOUND LOCALLY, CREATING NEW USER...");
     // If we cannot retreive a valid account locally, create a new account
     // (We assume this is the first time this device is using the app)
+    _createdNewInLastEnsure = true; // let app know that user should be prompted to input location
     final newUser = await createUser();
     currentUser = newUser;
     await _saveLocalUserToStorage(newUser);
@@ -214,6 +232,39 @@ class ClientService {
     {
       return null;
     }
+  }
+  /*
+    void::resetLocalUser()
+
+    helper to forget the current user on this device WITHOUT calling the server.
+    next time ensureUser() runs, a new user will be created.
+  */
+  Future<void> resetLocalUser() async
+  {
+    currentUser = null;
+    await _clearLocalUserFromStorage();
+  }
+
+  /*
+    bool::loadDarkModePreference()
+
+    helper to load the saved dark-mode flag from local storage.
+    defaults to false (light theme) if not set.
+  */
+  Future<bool> loadDarkModePreference() async
+  {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_appDarkModeKey) ?? false;
+  }
+  /*
+    void::saveDarkModePreference(bool enabled)
+
+    helper to save the dark-mode flag to local storage.
+  */
+  Future<void> saveDarkModePreference(bool enabled) async
+  {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_appDarkModeKey, enabled);
   }
 
 
@@ -300,6 +351,7 @@ class ClientService {
       longitude: currentUser!.longitude,
       created: currentUser!.created,
     );
+    await _saveLocalUserToStorage(currentUser!);
   }
   /*
     void::setUserCoordinates(double newLatitude, double newLongitude)
@@ -337,6 +389,7 @@ class ClientService {
       longitude: newLongitude,
       created: currentUser!.created,
     );
+    await _saveLocalUserToStorage(currentUser!);
     return currentUser;
   }
   /*
@@ -344,7 +397,8 @@ class ClientService {
 
     calls server to delete the current user
   */
-  Future<void> deleteUser() async {
+  Future<void> deleteUser() async
+  {
     if (currentUser == null) throw Exception('No current user on this device');
 
     final result = await _api.delete(
@@ -359,6 +413,75 @@ class ClientService {
 
     currentUser = null; // remove this user from devices memory
     await _clearLocalUserFromStorage(); // remove this user from the devices persistant storage
+  }
+  /*
+
+  */
+  Future<User> loginWithUsernamePassword(String username, String password) async
+  {
+    final result = await _api.postJson('/users/login',
+    {
+      'username': username.trim(),
+      'password': password.trim(),
+    });
+
+    if (result.statusCode == 401) throw Exception('Invalid username or password.');
+    if (result.statusCode != 200) throw Exception('Login failed: ${result.statusCode}');
+
+    final map = Map<String, Object?>.from(jsonDecode(result.body) as Map);
+    final user = User.fromMap(map);
+
+    currentUser = user;
+    await _saveLocalUserToStorage(user);
+    return user;
+  }
+  /*
+
+  */
+  Future<void> updateAccount
+  ({
+    String? displayName,
+    String? username,
+    String? password,
+  }) async
+  {
+    if (currentUser == null) {
+      throw Exception('No current user on this device');
+    }
+
+    final patch = <String, Object?>{};
+    if (displayName != null) patch['displayName'] = displayName;
+    if (username != null) patch['username'] = username;
+    if (password != null) patch['password'] = password;
+
+    if (patch.isEmpty) return;
+
+    final result = await _api.putJson(
+      '/users/${currentUser!.id}',
+      patch,
+      headers: _authHeaders(),
+    );
+
+    if (result.statusCode == 409) {
+      throw UsernameTakenException();
+    }
+    if (result.statusCode != 200) {
+      throw Exception('Failed to update account: ${result.statusCode} ${result.body}');
+    }
+
+    // Update local copy (don’t depend on server body shape)
+    currentUser = User(
+      id: currentUser!.id,
+      displayName: displayName ?? currentUser!.displayName,
+      username: username ?? currentUser!.username,
+      password: password ?? currentUser!.password,
+      authToken: currentUser!.authToken,
+      latitude: currentUser!.latitude,
+      longitude: currentUser!.longitude,
+      created: currentUser!.created,
+    );
+
+    await _saveLocalUserToStorage(currentUser!);
   }
 
 

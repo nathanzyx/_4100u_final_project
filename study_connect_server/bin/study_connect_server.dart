@@ -139,6 +139,43 @@ Future<void> _handleUsers
     return;
   }
   /*
+    /users/login
+  */
+  if (segments.length == 2 && segments[1] == 'login')
+  {
+    if (method != 'POST')
+    {
+      _methodNotAllowed(request, ['POST']);
+      return;
+    }
+
+    final body = await utf8.decoder.bind(request).join();
+    if (body.isEmpty) {
+      _badRequest(request, 'Missing request body');
+      return;
+    }
+
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    final username = (data['username'] as String?)?.trim();
+    final password = (data['password'] as String?)?.trim();
+
+    if (username == null || username.isEmpty || password == null || password.isEmpty)
+    {
+      _badRequest(request, 'username and password are required');
+      return;
+    }
+
+    final user = await db.getUserByUsernamePassword(username, password);
+    if (user == null)
+    {
+      _unauthorized(request);
+      return;
+    }
+
+    _json(request, user.toMap());
+    return;
+  }
+  /*
     /users/{id}
   */
   if (segments.length == 2) 
@@ -173,8 +210,9 @@ Future<void> _handleUsers
       final user = await _requireAuth(request, db);
       if (user == null) return;
 
-      // Ensure user making the call is changing themself
-      if (user.id != id) {
+      // Ensure user making call is changing themself
+      if (user.id != id)
+      {
         _forbidden(request);
         return;
       }
@@ -188,19 +226,75 @@ Future<void> _handleUsers
 
       final data = jsonDecode(body) as Map<String, dynamic>;
 
-      // Set supplied values
-      if (data['displayName'] != null) {   // Update display name if supplied
-        final displayName = data['displayName'] as String;
+      bool changed = false;
+
+      if (data['displayName'] != null)
+      {
+        final displayName = (data['displayName'] as String).trim();
+        if (displayName.isEmpty)
+        {
+          _badRequest(request, 'displayName cannot be empty');
+          return;
+        }
 
         await db.setUserDisplayName(id, displayName);
-      } else if (data['latitude'] != null && data['longitude'] != null) {   // Update coordinates if supplied
-        final latitude = data['latitude'] as double;
-        final longitude = data['longitude'] as double;
-
-        await db.setUserCoordinates(id, latitude, longitude);
+        changed = true;
       }
 
-      _json(request, {'success': 'true'});
+      if (data['latitude'] != null && data['longitude'] != null)
+      {
+        final latitude = (data['latitude'] as num).toDouble();
+        final longitude = (data['longitude'] as num).toDouble();
+        await db.setUserCoordinates(id, latitude, longitude);
+
+
+        changed = true;
+      }
+
+      if (data['username'] != null)
+      {
+        final username = (data['username'] as String).trim();
+        if (username.isEmpty)
+        {
+          _badRequest(request, 'username cannot be empty');
+          return;
+        }
+
+        final ownerId = await db.getUserIdByUsername(username);
+        if (ownerId != null && ownerId != id)
+        {
+          _conflict(request, 'username_taken');
+          return;
+        }
+
+        await db.setUserUsername(id, username);
+        changed = true;
+      }
+
+      if (data['password'] != null)
+      {
+        final password = (data['password'] as String).trim();
+
+        if (password.isEmpty)
+        {
+          _badRequest(request, 'password cannot be empty');
+          return;
+        }
+
+        await db.setUserPassword(id, password);
+        changed = true;
+      }
+
+      if (!changed)
+      {
+        _badRequest(request, 'No supported fields to update');
+        return;
+      }
+
+      // return updated user
+      final updated = await db.getUserById(id);
+
+      _json(request, {'success': true, 'user': updated?.toMap()});
     }
     else if (method == 'DELETE') 
     {
@@ -209,7 +303,8 @@ Future<void> _handleUsers
       if (user == null) return;
 
       // Ensure user making the call is naming themselves
-      if (user.id != id) {
+      if (user.id != id)
+      {
         _forbidden(request);
         return;
       }
@@ -224,6 +319,8 @@ Future<void> _handleUsers
     }
     return;
   }
+  
+  
 
   _notFound(request);
 }
@@ -851,6 +948,11 @@ void _unauthorized(HttpRequest request)
 void _forbidden(HttpRequest request) 
 {
   _text(request, 'Forbidden', statusCode: HttpStatus.forbidden);
+}
+
+void _conflict(HttpRequest request, String message)
+{
+  _json(request, {'error': message}, statusCode: HttpStatus.conflict);
 }
 
 Future<User?> _requireAuth

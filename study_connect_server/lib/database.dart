@@ -67,6 +67,7 @@ class AppDb {
             created INTEGER NOT NULL
           );
         ''');
+
         // await d.insert('users', {'displayName': 'You'});
 
 
@@ -524,6 +525,62 @@ class AppDb {
 
     if (rows.isEmpty) return null;
     return User.fromMap(rows.first);
+  }
+
+  Future<User?> getUserByUsernamePassword(String username, String password) async
+  {
+    final db_ = await db;
+
+    final rows = await db_.query
+    (
+      'users',
+      where: 'username = ? and password = ?',
+      whereArgs: [username, password],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+
+    
+    return User.fromMap(rows.first);
+  }
+
+  Future<int?> getUserIdByUsername(String username) async
+  {
+    final db_ = await db;
+
+    final rows = await db_.query(
+      'users',
+      columns: ['id'],
+      where: 'username = ?',
+      whereArgs: [username],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['id'] as int;
+  }
+
+  Future<void> setUserUsername(int userId, String newUsername) async
+  {
+    final db_ = await db;
+
+    await db_.update(
+      'users',
+      {'username': newUsername},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<void> setUserPassword(int userId, String newPassword) async
+  {
+    final db_ = await db;
+
+    await db_.update(
+      'users',
+      {'password': newPassword},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
   }
 
   Future<String?> getUserDisplayName(int userId) async

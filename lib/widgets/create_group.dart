@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:study_connect_shared/models/group.dart';
-import '../services/address_convert.dart';
+import 'package:latlong2/latlong.dart';
+import '../services/client/client_services.dart';
+import 'location_picker.dart';
+
+
+enum _LocationMode { myLocation, pickOnMap }
 
 // Dialog for creating a new StudyGroup
 // Appears as a popup form where users can enter group details
@@ -16,47 +21,94 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
   final _name = TextEditingController();
   final _description = TextEditingController();
   final _subject = TextEditingController();
-  // final _time = TextEditingController();
-  final _address = TextEditingController();
-  final _city = TextEditingController();
-  final _state = TextEditingController();
-  final _country = TextEditingController();
   final _tags = TextEditingController();
+
+  _LocationMode _locationMode = _LocationMode.myLocation; // default
+  PickedLocation? _pickedLocation;
+
+  bool _gettingLocation = false;
+
+  // to initially grab the users location for the group location
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_locationMode == _LocationMode.myLocation && _pickedLocation == null) {
+        _useMyLocation();
+      }
+    });
+  }
+
+  /*
+    Helper for locations
+  */
+  Future<void> _useMyLocation() async {
+    setState(() => _gettingLocation = true);
+
+    try {
+      final cs = ClientService();
+
+      // Make sure currentUser is loaded (in case dialog is opened early)
+      final u = cs.currentUser ?? await cs.ensureUser();
+
+      final point = LatLng(u.latitude, u.longitude);
+
+      // If you used 0,0 as “unset”, guard it
+      if (point.latitude == 0.0 && point.longitude == 0.0) {
+        throw Exception('Your profile location is not set yet.');
+      }
+
+      final label = await reverseGeocodeLabel(point) ?? 'My profile location';
+
+      if (!mounted) return;
+      setState(() {
+        _locationMode = _LocationMode.myLocation;
+        _pickedLocation = PickedLocation(point, label: label);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not use saved profile location: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _gettingLocation = false);
+    }
+  }
+
+  Future<void> _pickOnMap() async {
+    // Use current selection as a nice default center.
+    LatLng? initialCenter = _pickedLocation?.point;
+
+    // If no selection yet, try centering on the user's saved coords (if available).
+    final u = ClientService().currentUser;
+    initialCenter ??= (u == null) ? null : LatLng(u.latitude, u.longitude);
+
+    final picked = await showLocationPickerDialog(
+      context: context,
+      barrierDismissible: false,
+      title: 'Choose your location',
+    );
+
+    if (picked == null || !mounted) return;
+    setState(() {
+      _locationMode = _LocationMode.pickOnMap;
+      _pickedLocation = picked;
+    });
+  }
+
+  void _clearLocation() {
+    setState(() => _pickedLocation = null);
+  }
+
+
 
   /// Validates input and saves the new StudyGroup
   void _save() async {
     // Ensure required fields are filled
-    if (_name.text.isEmpty ||
-        _subject.text.isEmpty ||
-        // _time.text.isEmpty ||
-        _address.text.isEmpty ||
-        _city.text.isEmpty ||
-        _country.text.isEmpty) {
+    if (_name.text.trim().isEmpty || _subject.text.trim().isEmpty)
+    {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
-      );
-      return;
-    }
-
-    // Combine address fields
-    String fullAddress = [
-      _address.text.trim(),
-      _city.text.trim(),
-      _state.text.trim(),
-      _country.text.trim()
-    ].where((s) => s.isNotEmpty).join(", ");
-
-    // Convert address to coordinates
-    Map<String, double>? coordinates = await AddressConvert.addressToCoordinates(fullAddress);
-
-    double latitude;
-    double longitude;
-    if (coordinates != null) {
-      latitude = coordinates['latitude']!;
-      longitude = coordinates['longitude']!;
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid address')),
       );
       return;
     }
@@ -68,14 +120,20 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
         .where((s) => s.isNotEmpty)
         .toList();
 
-    // Create a new StudyGroup object
+    if (_pickedLocation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please choose a location for the group.')),
+      );
+      return;
+    }
+    final p = _pickedLocation!;
     final g = StudyGroup(
       name: _name.text.trim(),
       description: _description.text.trim(),
       subject: _subject.text.trim(),
-      location: fullAddress,
-      latitude: latitude,
-      longitude: longitude,
+      location: (p.label ?? 'Pinned location').trim(),
+      latitude: p.point.latitude,
+      longitude: p.point.longitude,
       tags: tags,
     );
 
@@ -85,6 +143,12 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final p = _pickedLocation;
+    final locationPreview = (p == null)
+        ? 'No location selected'
+        : '${(p.label ?? 'Pinned location')}\n'
+          '(${p.point.latitude.toStringAsFixed(5)}, ${p.point.longitude.toStringAsFixed(5)})';
+
     return Dialog(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -94,7 +158,7 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
             children: [
               // Title
               const Text(
-                'Create New Group',
+                'Create a Study Group',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
@@ -119,67 +183,82 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
               ),
               const SizedBox(height: 8),
 
-              // TextField(
-              //   controller: _time,
-              //   decoration: const InputDecoration(
-              //     labelText: 'Meeting Time *',
-              //     hintText: 'e.g., Tuesdays 6:00 PM',
-              //   ),
-              // ),
-              // const SizedBox(height: 8),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _address,
-                      decoration: const InputDecoration(
-                        labelText: 'Address *',
-                        hintText: 'e.g., 2000 Simcoe St N',
-                        hintStyle: TextStyle(
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _city,
-                      decoration: const InputDecoration(
-                        labelText: 'City *',
-                        hintText: 'e.g., Oshawa',
-                      ),
-                    ),
-                  ),
-                ],
+              // Location picker (new)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Location *',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _state,
-                      decoration: const InputDecoration(
-                        labelText: 'State',
-                        hintText: 'e.g., Ontario',
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _country,
-                      decoration: const InputDecoration(
-                        labelText: 'Country *',
-                        hintText: 'e.g., Canada',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
               const SizedBox(height: 8),
+
+              SegmentedButton<_LocationMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: _LocationMode.myLocation,
+                    label: Text('Use my location'),
+                    icon: Icon(Icons.my_location),
+                  ),
+                  ButtonSegment(
+                    value: _LocationMode.pickOnMap,
+                    label: Text('Pick on map'),
+                    icon: Icon(Icons.map),
+                  ),
+                ],
+                selected: {_locationMode},
+                onSelectionChanged: (s) async {
+                  final mode = s.first;
+
+                  // Optimistically update the UI selection
+                  setState(() => _locationMode = mode);
+
+                  if (mode == _LocationMode.myLocation) {
+                    await _useMyLocation();
+                    return;
+                  }
+
+                  // mode == pickOnMap
+                  await _pickOnMap();
+
+                  // If user cancels the map picker, revert to myLocation (or keep prior)
+                  if (!mounted) return;
+                  if (_pickedLocation == null) {
+                    setState(() => _locationMode = _LocationMode.myLocation);
+                    // optionally also auto-fill my location to ensure something is set:
+                    await _useMyLocation();
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+              if (_locationMode == _LocationMode.myLocation) 
+                Text(
+                  'Using your saved profile location.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      locationPreview,
+                      style: const TextStyle(fontSize: 12),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // IconButton(
+                  //   onPressed: (p == null) ? null : _clearLocation,
+                  //   icon: const Icon(Icons.clear),
+                  //   tooltip: 'Clear location',
+                  // ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
 
               TextField(
                 controller: _tags,

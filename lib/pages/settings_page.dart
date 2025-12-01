@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/app_notifier.dart';
+import '../services/client/client_services.dart';
+import 'package:study_connect_shared/models/user.dart';
+import 'account_settings_page.dart';
 
 /// Simple Settings screen for StudyConnect.
 /// Right now it lets you:
@@ -17,6 +20,93 @@ class SettingsPage extends StatefulWidget {
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _LoginDialog extends StatefulWidget {
+  const _LoginDialog({Key? key}) : super(key: key);
+
+  @override
+  State<_LoginDialog> createState() => _LoginDialogState();
+}
+
+class _LoginDialogState extends State<_LoginDialog> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _doLogin() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final cs = ClientService();
+    try {
+      final user = await cs.loginWithUsernamePassword(
+        _usernameController.text,
+        _passwordController.text,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(user);
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Log in'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(labelText: 'Username'),
+            enabled: !_loading,
+          ),
+          TextField(
+            controller: _passwordController,
+            decoration: const InputDecoration(labelText: 'Password'),
+            obscureText: true,
+            enabled: !_loading,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _loading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _loading ? null : _doLogin,
+          child: _loading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Log in'),
+        ),
+      ],
+    );
+  }
 }
 
 class _SettingsPageState extends State<SettingsPage> {
@@ -80,6 +170,43 @@ class _SettingsPageState extends State<SettingsPage> {
                   : 'Notifications turned OFF';
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(text)),
+              );
+            },
+          ),
+          const Divider(height: 1),
+
+          // Switch account tile
+          ListTile(
+            leading: const Icon(Icons.switch_account),
+            title: const Text('Switch account'),
+            subtitle: const Text('Log into another account on this device'),
+            onTap: () async
+            {
+              final cs = ClientService();
+              final u = await showDialog<User>(
+                context: context,
+                builder: (_) => const _LoginDialog(),
+              );
+              if (u == null || !mounted) return;
+
+              cs.stopNotificationPolling();
+              cs.startNotificationPolling();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Logged in as ${u.displayName}')),
+              );
+            },
+          ),
+
+          // Account settings page
+          ListTile(
+            leading: const Icon(Icons.manage_accounts),
+            title: const Text('Account settings'),
+            subtitle: const Text('Change display name, username, password'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AccountSettingsPage()),
               );
             },
           ),
