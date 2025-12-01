@@ -43,7 +43,10 @@ Each group member constributed the following
 - **Data Classes** (`study_connect_shared/lib/models/`)
     - `user.dart` (*created user data model*)
 - **App QOL**
-    - `run_project.ps1`
+    - `run_project.ps1` (*created powershell file to easily run app+server*)
+- **Frontend**
+    - **Pages** (`lib/pages/`)
+        - `account_settings_page.dart` (*created account settings for updating common account variables*)
 
 **Modified**
 - **Frontend**
@@ -51,8 +54,8 @@ Each group member constributed the following
         - `chat_page.dart`
         - `group_details_page.dart`
         - `home_page.dart`
-    - **Widgets** (`lib/widgets/`) (*minor updates*)
-        - `create_group.dart`
+    - **Widgets** (`lib/widgets/`) (*updates*)
+        - `create_group.dart` (*added location selection; user location or location specified by a popup map*)
         - `create_session.dart`
         - `edit.dart`
 - **Shared models** (`study_connect_shared/lib/models/`) (*minor additions*)
@@ -104,7 +107,7 @@ Each group member constributed the following
 - **Frontend** (`lib/pages/`)
     - `group_details_page.dart` (*membership logic, UI updates, conditional FAB and chat visibility*)
     - `home_page.dart` (*UI behavior adjustments related to membership flow*)
-       chat_page.dart` (*minor UI/usability improvements*)
+    - `chat_page.dart` (*minor UI/usability improvements*)
 - **Widgets** (`lib/widgets/`)
     - `create_session.dart` (*integration updates with session list*)
     - `create_group.dart` (*minor consistency fixes*)
