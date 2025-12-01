@@ -35,11 +35,11 @@ class AppDb {
     if (_db != null) return _db!;
 
     final path = join(await getDatabasesPath(), 'study_connect.db');
-    // await deleteDatabase(path); // FOR TESTING ONLY: reset DB on each run
+    await deleteDatabase(path); // FOR TESTING ONLY: reset DB on each run
 
     _db = await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (d, v) async {
 
         /*
@@ -101,6 +101,8 @@ class AppDb {
             description TEXT NOT NULL,
             subject TEXT NOT NULL,
             location TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
             tags TEXT NOT NULL,
             creatorId INTEGER NOT NULL, -- dormant field
             created INTEGER NOT NULL, -- dormant field
@@ -250,7 +252,9 @@ class AppDb {
           'name': 'Calculus I - Study Squad',
           'description': 'Limits, derivatives, and exam prep for Calc I.',
           'subject': 'Math',
-          'location': 'Library 2nd Floor',
+          'location': '2000 Simcoe St N, Oshawa, Ontario, Canada',
+          'latitude': 43.9455,
+          'longitude': -78.8961,
           'tags': 'Math|Calculus|First Year',
           'creatorId': aliceId,
           'created': ms(now.subtract(const Duration(days: 9))),
@@ -260,7 +264,9 @@ class AppDb {
           'name': 'Intro to Programming (C++)',
           'description': 'Weekly coding sessions and assignment help.',
           'subject': 'Computer Science',
-          'location': 'Lab B12',
+          'location': '226 W 46th St, New York, USA',
+          'latitude': 40.7594,
+          'longitude': -73.9866,
           'tags': 'CS|C++|Programming',
           'creatorId': bobId,
           'created': ms(now.subtract(const Duration(days: 7))),
@@ -270,7 +276,9 @@ class AppDb {
           'name': 'Psych 101 Review',
           'description': 'Review sessions before quizzes, share notes.',
           'subject': 'Psychology',
-          'location': 'Room H310',
+          'location': '10 Downing St, London, UK',
+          'latitude': 51.5035,
+          'longitude': -0.1276,
           'tags': 'Psychology|First Year',
           'creatorId': charlieId,
           'created': ms(now.subtract(const Duration(days: 6))),
@@ -384,9 +392,11 @@ class AppDb {
 
 
       onUpgrade: (d, oldV, newV) async {
-        if (oldV < 3) {
+        if (oldV < 4) {
           d.execute('ALTER TABLE users ADD COLUMN latitude REAL NOT NULL DEFAULT 0;');
           d.execute('ALTER TABLE users ADD COLUMN longitude REAL NOT NULL DEFAULT 0;');
+          d.execute('ALTER TABLE groups ADD COLUMN latitude REAL NOT NULL DEFAULT 0;');
+          d.execute('ALTER TABLE groups ADD COLUMN longitude REAL NOT NULL DEFAULT 0;');
         }
 
         await d.execute('CREATE TABLE IF NOT EXISTS messages('
@@ -684,6 +694,8 @@ class AppDb {
       'description': g.description,
       'subject': g.subject,
       'location': g.location,
+      'latitude': g.latitude,
+      'longitude': g.longitude,
       'tags': g.tags.join('|'),
     },
     where: 'id = ?',

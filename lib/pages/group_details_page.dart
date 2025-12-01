@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:study_connect_shared/models/group.dart';
-import 'package:study_connect_shared/models/session.dart'; // kept for later if you hook backend
-
-import '../services/client/client_services.dart';
+//import 'package:study_connect_shared/models/session.dart'; // kept for later if you hook backend
+//import '../services/client/client_services.dart';
 import '../services/app_notifier.dart';
 import '../services/local_sessions.dart';
 import '../widgets/create_session.dart';
@@ -23,7 +22,7 @@ class GroupDetailsPage extends StatefulWidget {
 }
 
 class _GroupDetailsPageState extends State<GroupDetailsPage> {
-  final _client = ClientService();
+  //final _client = ClientService();
   final _sessionStore = LocalSessionStore.instance;
 
   final List<SessionInfo> _sessions = [];
@@ -176,11 +175,10 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
             const SizedBox(height: 12),
 
             // Description
-            if (widget.group.description != null &&
-                widget.group.description!.isNotEmpty)
+            if (widget.group.description.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(widget.group.description!),
+                child: Text(widget.group.description),
               ),
 
             // Location line

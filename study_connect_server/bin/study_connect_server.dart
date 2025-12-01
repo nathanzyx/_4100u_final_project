@@ -293,11 +293,13 @@ Future<void> _handleGroups
         description: g.description,
         subject: g.subject,
         location: g.location,
+        latitude: g.latitude,
+        longitude: g.longitude,
         tags: g.tags,
         creatorId: user.id,
         created: null,
       );
-      final created = await db.insertGroup(group);
+      await db.insertGroup(group);
       _json(request, true, statusCode: HttpStatus.created);
     }
     else 
@@ -357,6 +359,8 @@ Future<void> _handleGroups
           description: g.description,
           subject: g.subject,
           location: g.location,
+          latitude: g.latitude,
+          longitude: g.longitude,
           tags: g.tags,
           creatorId: user.id,
           created: null,
@@ -499,7 +503,7 @@ Future<void> _handleGroups
           creatorId: user.id,
           created: DateTime.now(),
         );
-        final created = await db.addSession(session);
+        await db.addSession(session);
         _json(request, {'success': 'true'});
         return;
       }

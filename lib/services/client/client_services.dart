@@ -1,5 +1,4 @@
 // import 'package:path/path.dart';
-import 'package:path/path.dart';
 import 'package:study_connect_shared/models/user.dart';
 import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect_shared/models/session.dart';
@@ -246,6 +245,14 @@ class ClientService {
     return user;
   }
   /*
+    User::getUser()
+
+    method to acces private _getLocalUserFromStorage() method
+  */
+  Future<User?> getUser() async {
+    return await _getLocalUserFromStorage();
+  }
+  /*
     String?::getUserDisplayName(int userId)
 
     calls server to fetch the displayName of a user.
@@ -297,12 +304,12 @@ class ClientService {
   /*
     void::setUserCoordinates(double newLatitude, double newLongitude)
 
-    calls server to set the coordinates of the current user.
+    calls server to set the coordinates of the current user and returns the user.
 
     - double newLatitude: new latitude of the current user.
     - double newLongitude: new longitude of the current user.
   */
-  Future<void> setUserCoordinates(double newLatitude, double newLongitude) async {
+  Future<User?> setUserCoordinates(double newLatitude, double newLongitude) async {
     if (currentUser == null) {
       throw Exception('No current user on this device');
     }
@@ -330,6 +337,7 @@ class ClientService {
       longitude: newLongitude,
       created: currentUser!.created,
     );
+    return currentUser;
   }
   /*
     void::deleteUser()

@@ -5,6 +5,8 @@ class StudyGroup {
   final String description;     // Description of the study group
   final String subject;         // Subject or topic focus
   final String location;        // Loaction of group (not meetings)
+  final double latitude;        // Latitude of location
+  final double longitude;       // Longitude of location
   final List<String> tags;      // Keywords/tags like “Math” or “History”
   final int? creatorId;     // Dormant field for future use
   final int? created;        // Dormant field for future use
@@ -15,6 +17,8 @@ class StudyGroup {
     required this.description,
     required this.subject,
     required this.location,
+    required this.latitude,
+    required this.longitude,
     this.tags = const [],
     this.creatorId,
     this.created,
@@ -27,6 +31,8 @@ class StudyGroup {
     description: description,
     subject: subject,
     location: location,
+    latitude: latitude,
+    longitude: longitude,
     tags: tags,
     creatorId: creatorId,
     created: created,
@@ -39,6 +45,8 @@ class StudyGroup {
     'description': description,
     'subject': subject,
     'location': location,
+    'latitude': latitude,
+    'longitude': longitude,
     'tags': tags.join('|'),
     'creatorId': creatorId,
     'created': created,
@@ -51,6 +59,8 @@ class StudyGroup {
     description: m['description'] as String,
     subject: m['subject'] as String,
     location: m['location'] as String,
+    latitude: m['latitude'] as double,
+    longitude: m['longitude'] as double,
     tags: (m['tags'] as String?)?.split('|') ?? const [],
     creatorId: m['creatorId'] as int?,
     created: m['created'] as int?,

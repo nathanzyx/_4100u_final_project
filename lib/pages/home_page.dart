@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'dart:math';
 import 'package:study_connect_shared/models/group.dart';
+import 'package:study_connect_shared/models/user.dart';
 import 'package:study_connect/pages/group_details_page.dart';
 import 'package:study_connect/services/tips.dart';
 import 'package:study_connect/widgets/create_group.dart';
@@ -35,6 +37,7 @@ class _HomePageState extends State<HomePage> {
 
   final _search = TextEditingController(); // search box controller
 
+  User? _user;
   List<StudyGroup> _groups = [];           // loaded list of groups
   String _tip = 'Loading tip...';          // motivational tip text
 
@@ -44,6 +47,15 @@ class _HomePageState extends State<HomePage> {
     _client.startNotificationPolling(); // begin polling for notifications
     _load(); // fetch groups and daily tip
     _getLocation(); // get user location
+  }
+
+  // Calculate the distance between two points
+  double calculateDistance(double lat1, double lon1, double lat2, double lon2){
+    double p = 0.017453292519943295;
+    double a = 0.5 - cos((lat2 - lat1) * p)/2 + 
+          cos(lat1 * p) * cos(lat2 * p) * 
+          (1 - cos((lon2 - lon1) * p))/2;
+    return 12742 * asin(sqrt(a));
   }
 
   // Prompts user to choose their location on an interactive map
@@ -63,10 +75,12 @@ class _HomePageState extends State<HomePage> {
 
   /// Loads study groups and the daily tip
   Future<void> _load() async {
+    final u = await _client.getUser() as User;   // Fetch current user from storage
     final q = _search.text.trim();
     final g = await _client.getGroups(query: q.isEmpty ? null : q);
     final tip = await TipsService.fetchDailyTip();
     setState(() {
+      _user = u;
       _groups = g;
       _tip = tip;
     });
@@ -157,7 +171,7 @@ class _HomePageState extends State<HomePage> {
       child: Card(
         child: ListTile(
           title: Text(g.name),
-          subtitle: Text('${g.subject}\n${g.location}'),
+          subtitle: Text('${g.subject}\n${g.location.split(",").map((s) => s.trim()).toList()[0]}'),  // Only show street address
           isThreeLine: true,
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
@@ -182,6 +196,14 @@ class _HomePageState extends State<HomePage> {
           g.subject.toLowerCase().contains(query) ||
           g.tags.any((t) => t.toLowerCase().contains(query));
     }).toList();
+
+    // Sort groups based on distance to user from closest -> farthest
+    filtered.sort((g1, g2) {
+      final diff1 = calculateDistance(g1.latitude, g1.longitude, _user!.latitude, _user!.longitude);
+      final diff2 = calculateDistance(g2.latitude, g2.longitude, _user!.latitude, _user!.longitude);
+      
+      return diff1.compareTo(diff2);
+    });
 
     if (filtered.isEmpty) {
       return const Padding(

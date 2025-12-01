@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:study_connect_shared/models/user.dart';
+//import 'package:study_connect_shared/models/user.dart';
 import 'package:study_connect_shared/models/group.dart';
-import 'package:study_connect_shared/models/session.dart';
+//import 'package:study_connect_shared/models/session.dart';
 import 'package:study_connect_shared/models/chat_message.dart';
 import '../services/client/client_services.dart';
 import '../services/app_notifier.dart';
@@ -32,13 +32,13 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   // old helper – not used anymore, but kept in case you want a separate init
-  Future<void> _init() async {
-    final msgs = await _client.getMessages(widget.group.id!);
+  // Future<void> _init() async {
+  //   final msgs = await _client.getMessages(widget.group.id!);
 
-    setState(() {
-      _messages = msgs;
-    });
-  }
+  //   setState(() {
+  //     _messages = msgs;
+  //   });
+  // }
 
   /// Loads all messages for this group (ascending by time)
   Future<void> _loadMessages() async {
