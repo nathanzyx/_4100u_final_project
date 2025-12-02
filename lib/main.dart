@@ -11,16 +11,7 @@ Future<void> main() async {
   final client = ClientService();
   final initialDarkMode = await client.loadDarkModePreference();
 
-  // Make sure we have a local user stored
-  // (run in background so it doesn't block startup)
-  // ClientService().ensureUser().then((_) {
-  //   debugPrint('DEBUG ensureUser finished');
-  // }).catchError((e, st) {
-  //   debugPrint('DEBUG ensureUser error: $e');
-  // });
-
-  // Set up local notifications (also non-blocking)
-  NotificationService.instance.init().then((_) {
+  await NotificationService.instance.init().then((_) {
     debugPrint('DEBUG NotificationService.init finished');
   }).catchError((e, st) {
     debugPrint('DEBUG NotificationService.init error: $e');

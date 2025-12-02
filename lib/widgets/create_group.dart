@@ -76,10 +76,8 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
   }
 
   Future<void> _pickOnMap() async {
-    // Use current selection as a nice default center.
     LatLng? initialCenter = _pickedLocation?.point;
 
-    // If no selection yet, try centering on the user's saved coords (if available).
     final u = ClientService().currentUser;
     initialCenter ??= (u == null) ? null : LatLng(u.latitude, u.longitude);
 
@@ -102,7 +100,7 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
 
 
 
-  /// Validates input and saves the new StudyGroup
+  // Validates input and saves the new StudyGroup
   void _save() async {
     // Ensure required fields are filled
     if (_name.text.trim().isEmpty || _subject.text.trim().isEmpty)
@@ -221,11 +219,10 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
                   // mode == pickOnMap
                   await _pickOnMap();
 
-                  // If user cancels the map picker, revert to myLocation (or keep prior)
+                  // if user cancels the map picker, revert to user location
                   if (!mounted) return;
                   if (_pickedLocation == null) {
                     setState(() => _locationMode = _LocationMode.myLocation);
-                    // optionally also auto-fill my location to ensure something is set:
                     await _useMyLocation();
                   }
                 },
@@ -250,11 +247,6 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // IconButton(
-                  //   onPressed: (p == null) ? null : _clearLocation,
-                  //   icon: const Icon(Icons.clear),
-                  //   tooltip: 'Clear location',
-                  // ),
                 ],
               ),
 
@@ -269,7 +261,6 @@ class _CreateGroupDialogState extends State<CreateGroupDialog> {
               ),
               const SizedBox(height: 12),
 
-              // Action buttons
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [

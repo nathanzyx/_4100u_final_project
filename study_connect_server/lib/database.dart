@@ -8,6 +8,8 @@ import 'package:study_connect_shared/models/session.dart';
 import 'package:study_connect_shared/models/chat_message.dart';
 import 'dart:math';
 
+import 'seed_data.dart';
+
 // SQLite database handler for StudyConnect
 // Handles all CRUD operations for:
 //  - groups     -> study communities
@@ -35,7 +37,7 @@ class AppDb {
     if (_db != null) return _db!;
 
     final path = join(await getDatabasesPath(), 'study_connect.db');
-    await deleteDatabase(path); // FOR TESTING ONLY: reset DB on each run
+    // await deleteDatabase(path); // FOR TESTING ONLY: reset DB on each run
 
     _db = await openDatabase(
       path,
@@ -67,8 +69,6 @@ class AppDb {
             created INTEGER NOT NULL
           );
         ''');
-
-        // await d.insert('users', {'displayName': 'You'});
 
 
       
@@ -210,187 +210,10 @@ class AppDb {
             FOREIGN KEY(messageId) REFERENCES messages(id) ON DELETE CASCADE
           );
         ''');
-      
 
-
-        // DEMO SEED DATA (just for example visuals, remove later)
-        final now = DateTime.now();
-        int ms(DateTime dt) => dt.millisecondsSinceEpoch;
-
-        // Users
-        final aliceId = await d.insert('users', {
-          'displayName': 'Alice',
-          'username': 'alice',
-          'password': 'alicepw',
-          'authToken': 'seed_alice_token',
-          'latitude': 43.6532,
-          'longitude': -79.3832,
-          'created': ms(now.subtract(const Duration(days: 10))),
-        });
-
-        final bobId = await d.insert('users', {
-          'displayName': 'Bob',
-          'username': 'bob',
-          'password': 'bobpw',
-          'authToken': 'seed_bob_token',
-          'latitude': 43.6532,
-          'longitude': -79.3832,
-          'created': ms(now.subtract(const Duration(days: 8))),
-        });
-
-        final charlieId = await d.insert('users', {
-          'displayName': 'Charlie',
-          'username': 'charlie',
-          'password': 'charliepw',
-          'authToken': 'seed_charlie_token',
-          'latitude': 43.6532,
-          'longitude': -79.3832,
-          'created': ms(now.subtract(const Duration(days: 5))),
-        });
-
-        // Groups
-        final calcGroupId = await d.insert('groups', {
-          'name': 'Calculus I - Study Squad',
-          'description': 'Limits, derivatives, and exam prep for Calc I.',
-          'subject': 'Math',
-          'location': '2000 Simcoe St N, Oshawa, Ontario, Canada',
-          'latitude': 43.9455,
-          'longitude': -78.8961,
-          'tags': 'Math|Calculus|First Year',
-          'creatorId': aliceId,
-          'created': ms(now.subtract(const Duration(days: 9))),
-        });
-
-        final csGroupId = await d.insert('groups', {
-          'name': 'Intro to Programming (C++)',
-          'description': 'Weekly coding sessions and assignment help.',
-          'subject': 'Computer Science',
-          'location': '226 W 46th St, New York, USA',
-          'latitude': 40.7594,
-          'longitude': -73.9866,
-          'tags': 'CS|C++|Programming',
-          'creatorId': bobId,
-          'created': ms(now.subtract(const Duration(days: 7))),
-        });
-
-        final psychGroupId = await d.insert('groups', {
-          'name': 'Psych 101 Review',
-          'description': 'Review sessions before quizzes, share notes.',
-          'subject': 'Psychology',
-          'location': '10 Downing St, London, UK',
-          'latitude': 51.5035,
-          'longitude': -0.1276,
-          'tags': 'Psychology|First Year',
-          'creatorId': charlieId,
-          'created': ms(now.subtract(const Duration(days: 6))),
-        });
-
-        final calcSess1Id = await d.insert('sessions', {
-          'groupId': calcGroupId,
-          'title': 'Limit Laws Deep Dive',
-          'description': 'In-depth exploration of limit laws and their applications',
-          'start': ms(now.add(const Duration(days: 1, hours: 17))),
-          'end': ms(now.add(const Duration(days: 1, hours: 19))),
-          'location': 'Library 2nd Floor - Table 4',
-          'maxAttendees': 8,
-          'attendees': 3,
-          'creatorId': aliceId,
-          'created': ms(now.subtract(const Duration(days: 1))),
-        });
-
-        await d.insert('sessions', {
-          'groupId': calcGroupId,
-          'title': 'Derivatives Practice Marathon',
-          'description': 'Long practice session with worked examples and problem solving',
-          'start': ms(now.add(const Duration(days: 3, hours: 18))),
-          'end': ms(now.add(const Duration(days: 3, hours: 20))),
-          'location': 'Library 1st Floor - Study Room A',
-          'maxAttendees': 10,
-          'attendees': 5,
-          'creatorId': aliceId,
-          'created': ms(now),
-        });
-
-        final csSess1Id = await d.insert('sessions', {
-          'groupId': csGroupId,
-          'title': 'Pointers & Memory Basics',
-          'description': 'Beginner-friendly introduction to pointers, references, and memory allocation',
-          'start': ms(now.add(const Duration(days: 2, hours: 16))),
-          'end': ms(now.add(const Duration(days: 2, hours: 18))),
-          'location': 'Lab B12',
-          'maxAttendees': 12,
-          'attendees': 4,
-          'creatorId': bobId,
-          'created': ms(now.subtract(const Duration(hours: 3))),
-        });
-
-        final psychSess1Id = await d.insert('sessions', {
-          'groupId': psychGroupId,
-          'title': 'Chapter 3: Memory & Learning',
-          'description': 'Review session with Kahoot quiz covering memory and learning concepts',
-          'start': ms(now.add(const Duration(days: 4, hours: 15))),
-          'end': ms(now.add(const Duration(days: 4, hours: 17))),
-          'location': 'Room H310',
-          'maxAttendees': 15,
-          'attendees': 6,
-          'creatorId': charlieId,
-          'created': ms(now),
-        });
-
-        // Messages in Calculus group
-        await d.insert('messages', {
-          'groupId': calcGroupId,
-          'sessionId': calcSess1Id,
-          'creatorId': aliceId,
-          'text': 'Hey everyone! We\'ll focus on limits from section 2.3 tomorrow.',
-          'date': ms(now.subtract(const Duration(days: 1, hours: 2))),
-        });
-
-        await d.insert('messages', {
-          'groupId': calcGroupId,
-          'sessionId': calcSess1Id,
-          'creatorId': bobId,
-          'text': 'Nice! I\'ll bring some practice problems.',
-          'date': ms(now.subtract(const Duration(days: 1, hours: 1, minutes: 30))),
-        });
-
-        await d.insert('messages', {
-          'groupId': calcGroupId,
-          'sessionId': null,
-          'creatorId': charlieId,
-          'text': 'Anyone else struggling with epsilon-delta? Can we add that?',
-          'date': ms(now.subtract(const Duration(hours: 6))),
-        });
-
-        // Messages in CS group
-        await d.insert('messages', {
-          'groupId': csGroupId,
-          'sessionId': csSess1Id,
-          'creatorId': bobId,
-          'text': 'Today: pointers, references, and why your program segfaults 😈',
-          'date': ms(now.subtract(const Duration(hours: 5))),
-        });
-
-        await d.insert('messages', {
-          'groupId': csGroupId,
-          'sessionId': csSess1Id,
-          'creatorId': aliceId,
-          'text': 'Can we also review dynamic arrays?',
-          'date': ms(now.subtract(const Duration(hours: 4, minutes: 30))),
-        });
-
-        // Messages in Psych group
-        await d.insert('messages', {
-          'groupId': psychGroupId,
-          'sessionId': psychSess1Id,
-          'creatorId': charlieId,
-          'text': 'We\'ll do a quick Kahoot on chapters 1-3 at the end.',
-          'date': ms(now.subtract(const Duration(hours: 2))),
-        });
+        // insert AI generated demo data into the database (only seeds if no user exist (empty db))
+        await DemoSeed.seed(d);
       },
-
-
-
 
       onUpgrade: (d, oldV, newV) async {
         if (oldV < 4) {
@@ -475,7 +298,7 @@ class AppDb {
         'created': now,
     });
 
-    return User(
+    User user = User(
       id: id,
       displayName: displayName,
       username: username,
@@ -485,6 +308,10 @@ class AppDb {
       longitude: longitude,
       created: now
     );
+
+    print("CREATED NEW USER username=${user.username} id=${user.id}");
+
+    return user;
   }
 
   //
@@ -637,7 +464,7 @@ class AppDb {
 
   */
 
-  /// Fetches all groups (sorted by name)
+  // Fetches all groups (sorted by name)
   Future<List<StudyGroup>> getGroups
   (
     {
@@ -647,12 +474,19 @@ class AppDb {
       String? tag,
       int limit = 50,
       int? beforeCreated,
-      int? afterCreated
+      int? afterCreated,
+      
+      // for geolocation
+      double? nearLat,
+      double? nearLng,
+      double? withinKm,
     }
   ) async
   {
     final _db = await db;
     final iLimit = limit <= 0 ? 50 : (limit > 200 ? 200 : limit);
+    // determine if we should use geolocation for selective search
+    final useGeo = nearLat != null && nearLng != null && withinKm != null && withinKm > 0;
 
     final whereParts = <String>[];
     final whereArgs = <Object>[];
@@ -698,6 +532,24 @@ class AppDb {
       whereParts.add('created > ?');
       whereArgs.add(afterCreated);
     }
+    if (useGeo) {
+      final dLat = withinKm / 111.32;
+
+      final latRad = _deg2rad(nearLat!);
+      final cosLat = cos(latRad).abs();
+      final dLon = (cosLat < 1e-6) ? 180.0 : (withinKm / (111.32 * cosLat));
+
+      whereParts.add('latitude BETWEEN ? AND ?');
+      whereArgs.add(nearLat - dLat);
+      whereArgs.add(nearLat + dLat);
+
+      whereParts.add('longitude BETWEEN ? AND ?');
+      whereArgs.add(nearLng - dLon);
+      whereArgs.add(nearLng + dLon);
+    }
+
+    // 1000km limit
+    final geolocationLimit = useGeo ? 1000 : iLimit;
 
     final rows = await _db.query
     (
@@ -705,10 +557,26 @@ class AppDb {
       where: whereParts.isEmpty ? null : whereParts.join(' AND '),
       whereArgs: whereParts.isEmpty ? null : whereArgs,
       orderBy: 'created DESC, name ASC',
-      limit: iLimit,
+      limit: geolocationLimit,
     );
 
-    return rows.map(StudyGroup.fromMap).toList();
+    final groups = rows.map(StudyGroup.fromMap).toList();
+
+    if (!useGeo) return groups;
+
+    // distance filter + sort by distance
+    final pairs = <MapEntry<StudyGroup, double>>[];
+    for (final g in groups)
+    {
+      final d = _haversineKm(nearLat, nearLng, g.latitude, g.longitude);
+      if (d <= withinKm) {
+        pairs.add(MapEntry(g, d));
+      }
+    }
+
+    pairs.sort((a, b) => a.value.compareTo(b.value));
+
+    return pairs.take(iLimit).map((e) => e.key).toList();
   }
 
   // Fetches group given by id
@@ -726,7 +594,7 @@ class AppDb {
   }
 
   /// Inserts a new group into the database
-  Future<void> insertGroup(StudyGroup g) async
+  Future<StudyGroup> insertGroup(StudyGroup g) async
   {
     final dbInst = await db;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -735,10 +603,21 @@ class AppDb {
     ..remove('id')
     ..['created'] ??= now;
 
-    dbInst.insert('groups', map);
+    final newId = await dbInst.insert('groups', map);
 
-    return;
-    // return dbInst.insert('groups', map);
+    return StudyGroup(
+      id: newId,
+      name: g.name,
+      description: g.description,
+      subject: g.subject,
+      location: g.location,
+      latitude: g.latitude,
+      longitude: g.longitude,
+      tags: g.tags,
+      creatorId: g.creatorId,
+      created: map['created'] as int?,
+      joined: false,
+    );
   }
 
   /// Updates an existing group’s info
@@ -765,28 +644,119 @@ class AppDb {
     final db_ = await db;
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    if (joined == true)
-    {
-      await db_.insert
-      (
-        'group_members',
+    // transaction to prevent partial completions
+    await db_.transaction((transaction) async {
+      if (joined == true)
+      {
+        await transaction.insert
+        (
+          'group_members',
+          {
+            'userId': userId,
+            'groupId': groupId,
+            'joinedAt': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        return;
+      }
+
+
+      // if user is leaving the group
+      {
+        // get all sessions the user has joined in inside the group they are leaving
+        final sessionRows = await transaction.rawQuery
+        (
+          'SELECT sm.sessionId AS sessionId '
+          'FROM session_members sm '
+          'JOIN sessions s ON s.id = sm.sessionId '
+          'WHERE sm.userId = ? AND s.groupId = ?',
+          [userId, groupId],
+        );
+        // for each session the user is joined in inside the group they are leaving, make the user leave
+        for (final r in sessionRows)
         {
-          'userId': userId,
-          'groupId': groupId,
-          'joinedAt': now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
-    }
-    else
+          final sessionId = r['sessionId'] as int;
+          final deleted = await transaction.delete
+          (
+            'session_members',
+            where: 'userId = ? AND sessionId = ?',
+            whereArgs: [userId, sessionId],
+          );
+          if (deleted > 0)
+          {
+            await transaction.rawUpdate
+            (
+              'UPDATE sessions '
+              'SET attendees = CASE WHEN attendees > 0 THEN attendees - 1 ELSE 0 END '
+              'WHERE id = ?',
+              [sessionId],
+            );
+          }
+        }
+
+        // finally, make the user leave the group
+        await transaction.delete
+        (
+          'group_members',
+          where: 'userId = ? AND groupId = ?',
+          whereArgs: [userId, groupId],
+        );
+      }
+    });
+  }
+
+  Future<Set<int>> getJoinedGroupIds(int userId) async
+  {
+    final db_ = await db;
+    final rows = await db_.query
+    (
+      'group_members',
+      columns: ['groupId'],
+      where: 'userId = ?',
+      whereArgs: [userId],
+    );
+    return rows.map((r) => r['groupId'] as int).toSet();
+  }
+
+  Future<bool> isUserInGroup(int userId, int groupId) async
+  {
+    final db_ = await db;
+    final rows = await db_.query
+    (
+      'group_members',
+      columns: ['groupId'],
+      where: 'userId = ? AND groupId = ?',
+      whereArgs: [userId, groupId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<Map<int, int>> getGroupMemberCounts(List<int> groupIds) async
+  {
+    if (groupIds.isEmpty) return <int, int>{};
+
+    final db_ = await db;
+    final placeholders = List.filled(groupIds.length, '?').join(',');
+
+    final rows = await db_.rawQuery
+    (
+      'SELECT groupId, COUNT(*) AS count '
+      'FROM group_members '
+      'WHERE groupId IN ($placeholders) '
+      'GROUP BY groupId',
+      groupIds,
+    );
+
+    final result = <int, int>{};
+    for (final row in  rows)
     {
-      await db_.delete
-      (
-        'group_members',
-        where: 'userId = ? AND groupId = ?',
-        whereArgs: [userId, groupId],
-      );
+      final gid = row['groupId'] as int;
+      final cnt = row['count'] as int;
+      result[gid] = cnt;
     }
+    return result;
   }
 
   /// Deletes a group by ID
@@ -797,7 +767,7 @@ class AppDb {
 
   /*
 
-    Group Methods
+    Session Methods
 
   */
 
@@ -942,6 +912,21 @@ class AppDb {
         );
       }
     }
+  }
+
+  Future<Set<int>> getJoinedSessionIdsForUserInGroup(int userId, int groupId) async
+  {
+    final db_ = await db;
+    final rows = await db_.rawQuery
+    (
+      'SELECT sm.sessionId AS sessionId '
+      'FROM session_members sm '
+      'JOIN sessions s ON s.id = sm.sessionId '
+      'WHERE sm.userId = ? AND s.groupId = ?',
+      [userId, groupId],
+    );
+
+    return rows.map((r) => r['sessionId'] as int).toSet();
   }
 
   /// Deletes a specific session
@@ -1092,7 +1077,7 @@ class AppDb {
     for (final row in members)
     {
       final userId = row['userId'] as int;
-      if (userId == creatorId) continue; // dont notify the creator of the message
+      // if (userId == creatorId) continue; // dont notify the creator of the message
 
       await db_.insert('notifications',
         {
@@ -1104,6 +1089,9 @@ class AppDb {
         }
       );
     }
+
+    print('[NOTIF] groupId=$groupId messageId=$messageId creatorId=$creatorId');
+    print('[NOTIF] members=${members.length} ids=${members.map((r)=>r['userId']).toList()}');
   }
 
   Future<List<Map<String, Object?>>> getUnreadNotificationsForUser
@@ -1155,12 +1143,32 @@ class AppDb {
 
   Future<void> markNotificationsAsRead(List<int> notifIds) async
   {
-    if (notifIds.isEmpty) return;
+    if (notifIds.isEmpty)
+    {
+      print("NOTIFICATION IDS EMPTY");
+      return;
+    }
     final db_ = await db;
 
     final placeholders = List.filled(notifIds.length, '?').join(',');
     await db_.rawUpdate('UPDATE notifications SET read = 1 WHERE id IN ($placeholders)',notifIds);
+    print("RAW UPDATE");
   }
 
+  /*
+    Helpers for location based search
 
+    Please note that these 2 functions were made with the help of AI, as lat/lng search is very complex
+  */
+
+  double _deg2rad(double deg) => deg * (pi / 180.0);
+  double _haversineKm(double lat1, double lon1, double lat2, double lon2)
+  {
+    const earthRadiusKm = 6371.0;
+    final dLat = _deg2rad(lat2 - lat1);
+    final dLon = _deg2rad(lon2 - lon1);
+    final a = pow(sin(dLat / 2), 2) + cos(_deg2rad(lat1)) * cos(_deg2rad(lat2)) * pow(sin(dLon / 2), 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
 }

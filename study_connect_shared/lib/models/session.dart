@@ -10,7 +10,10 @@ class StudySession {
   final int maxAttendees;     // Maximum allowed participants
   final int attendees;        // Current number of attendees
   final int? creatorId;      // Dormant field for future use
-  final DateTime created;   // Creation timestamp (optional)
+  final DateTime created;   // Creation timestamp
+
+  // api only variable for indicating device user joined status
+  final bool joined;
 
   StudySession({
     this.id,
@@ -24,10 +27,11 @@ class StudySession {
     this.attendees = 0,
     this.creatorId,
     DateTime? created,
+    this.joined = false,
   }) : created = created ?? DateTime.now();
 
   // Converts this object into a Map for saving into SQLite
-  Map<String, Object?> toMap() => {
+  Map<String, Object?> toMap({bool includeJoined = false}) => {
     'id': id,
     'groupId': groupId,
     'title': title,
@@ -39,6 +43,7 @@ class StudySession {
     'attendees': attendees,
     'creatorId': creatorId,
     'created': created.millisecondsSinceEpoch,
+    if (includeJoined) 'joined': joined
   };
 
   // Creates a StudySession instance from a Map (from SQLite)
@@ -54,5 +59,43 @@ class StudySession {
     attendees: (m['attendees'] as int?) ?? 0,
     creatorId: m['creatorId'] as int?,
     created: DateTime.fromMillisecondsSinceEpoch(m['created'] as int),
+    joined: _parseBool(m['joined'], def: false)
   );
+
+  /*
+    Helper to copy a session data instance with/without the joined variable
+  */
+  StudySession copyWith({bool? joined}) => StudySession(
+    id: id,
+    groupId: groupId,
+    title: title,
+    description: description,
+    start: start,
+    end: end,
+    location: location,
+    maxAttendees: maxAttendees,
+    attendees: attendees,
+    creatorId: creatorId,
+    created: created,
+    joined: joined ?? this.joined
+  );
+  /*
+    bool _parseBool(Object? v, {bool def = false})
+
+    Helper to parse a bool value for joined
+  */
+  static bool _parseBool(Object? v, {bool def = false})
+  {
+    if (v == null) return def;
+    if (v is bool) return v;
+    if (v is int) return v != 0;
+    if (v is num) return v != 0;
+    if (v is String)
+    {
+      final s = v.trim().toLowerCase();
+      if (s == 'true' || s == '1' || s == 'yes' || s == 'y') return true;
+      if (s == 'false' || s == '0' || s == 'no' || s == 'n') return false;
+    }
+    return def;
+  }
 }

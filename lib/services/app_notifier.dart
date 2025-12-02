@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Small helper for showing in-app messages.
-/// We also use a flag so the Settings page can turn them on or off.
+// helper for showing in-app messages.
 class AppNotifier {
-  // When this is false, we do not show any SnackBars.
   static bool notificationsEnabled = true;
 
   static void show(
@@ -11,7 +9,6 @@ class AppNotifier {
         required String message,
         IconData? icon,
       }) {
-    // Respect the settings toggle
     if (!notificationsEnabled) return;
 
     final theme = Theme.of(context);

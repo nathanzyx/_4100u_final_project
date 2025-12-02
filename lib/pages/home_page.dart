@@ -36,6 +36,11 @@ class _HomePageState extends State<HomePage> {
 
   final _search = TextEditingController(); // search box controller
 
+  // for geolocation
+  LatLng? _nearPoint;
+  String? _nearLabel;
+  double? _nearKm;
+
   List<StudyGroup> _groups = [];           // loaded list of groups
   String _tip = 'Loading tip...';          // motivational tip text
 
@@ -67,7 +72,13 @@ class _HomePageState extends State<HomePage> {
   /// Loads study groups and the daily tip
   Future<void> _load() async {
     final q = _search.text.trim();
-    final g = await _client.getGroups(query: q.isEmpty ? null : q);
+    final g = await _client.getGroups
+    (
+      query: q.isEmpty ? null : q,
+      nearLat: _nearPoint?.latitude,
+      nearLng: _nearPoint?.longitude,
+      withinKm: _nearKm,
+    );
     final tip = await TipsService.fetchDailyTip();
     setState(() {
       _groups = g;
@@ -110,72 +121,97 @@ class _HomePageState extends State<HomePage> {
 
   /// Builds the search field for filtering groups
   Widget _buildSearchBox() {
-    return TextField(
-      controller: _search,
-      decoration: const InputDecoration(
-        prefixIcon: Icon(Icons.search),
-        hintText: 'Search study groups...',
-        border: OutlineInputBorder(),
-      ),
-      onChanged: (_) {
-        _load();
-      },
-    );
-  }
+    final hasNear = _nearPoint != null && _nearKm != null;
 
-  /// Builds a single group card (with swipe-to-delete)
-  Widget _buildGroupTile(StudyGroup g) {
-    return Dismissible(
-      key: ValueKey('g_${g.id}_${g.name}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white, size: 28),
-      ),
-      confirmDismiss: (_) async {
-        // confirm deletion dialog
-        return await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Delete group?'),
-            content: Text(
-                'This will remove "${g.name}" and all its sessions & chat.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete'),
-              ),
-            ],
+    return Row(
+      children:
+      [
+        Expanded(
+          child: TextField(
+            controller: _search,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Search study groups...',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (i) => _load(),
           ),
-        ) ??
-            false;
-      },
-      onDismissed: (_) => _deleteGroup(g),
-      child: Card(
-        child: ListTile(
-          title: Text(g.name),
-          subtitle: Text('${g.subject}\n${g.location}'),
-          isThreeLine: true,
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => GroupDetailsPage(group: g)),
-            );
-            await _load(); // refresh on return
-          },
         ),
-      ),
+        const SizedBox(width: 10),
+        Tooltip(
+          message: hasNear ? 'Nearby filter (active)' : 'Nearby filter',
+          child: IconButton.filledTonal(
+            onPressed: _openNearbyFilter,
+            icon: Icon(hasNear ? Icons.near_me : Icons.near_me_outlined),
+          ),
+        ),
+      ],
     );
   }
 
-  /// Builds the list of study groups (filtered by search)
+  // small helper for reducing location size
+  String _shorten(String text, {int max = 40})
+  {
+    if (text.length <= max) return text;
+    return text.substring(0, max) + '…';
+  }
+
+  Future<void> _refreshGroups() => _load();
+
+  Widget _buildGroupTile(StudyGroup g)
+  {
+    final isJoined = g.joined;
+
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      clipBehavior: Clip.antiAlias,
+    child: ListTile(
+      title: Text(g.name),
+      subtitle: 
+        Text(
+          '${g.subject}\n${_shorten(g.location, max: 19)}\n${g.numMembers} member${g.numMembers == 1 ? '' : 's'}'
+          '${isJoined ? " • Joined" : ""}',
+        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isJoined)
+            OutlinedButton(
+              onPressed: () async {
+                await _client.setJoinedGroup(g.id!, false);
+                _refreshGroups();
+              },
+              child: const Text('Leave'),
+            )
+          else
+            FilledButton(
+              onPressed: () async {
+                await _client.setJoinedGroup(g.id!, true);
+                _refreshGroups();
+              },
+              child: const Text('Join'),
+            ),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => GroupDetailsPage(group: g)),
+        );
+        _refreshGroups();
+      },
+    ),
+    );
+  }
+
+  /// build the list of study groups (filtered by search)
   Widget _buildGroupList() {
     final query = _search.text.trim().toLowerCase();
 
@@ -190,7 +226,7 @@ class _HomePageState extends State<HomePage> {
       return const Padding(
         padding: EdgeInsets.all(24),
         child: Center(
-          child: Text('No groups yet. Tap "New Group" to add one!'),
+          child: Text('There are no groups! 🔎'),
         ),
       );
     }
@@ -239,9 +275,166 @@ class _HomePageState extends State<HomePage> {
             _buildSearchBox(),
             const SizedBox(height: 12),
             _buildGroupList(),
+            const SizedBox(height: 12),
+            _buildNearbyLoc(),
+            if (_nearPoint != null) const SizedBox(height: 12),
           ],
         ),
       ),
     );
   }
+
+  /*
+    Helpers for geolocation searching
+  */
+  Future<void> _openNearbyFilter() async
+  {
+    final outerContext = context;
+
+    LatLng? point = _nearPoint ?? (_client.currentUser == null ? null : LatLng(_client.currentUser!.latitude, _client.currentUser!.longitude));
+    String? label = _nearLabel;
+    final kmCtrl = TextEditingController(text: (_nearKm ?? 10).toString());
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Nearby groups'),
+          content: StatefulBuilder(
+            builder: (ctx, setModal) {
+              final display = label ??
+                  (point == null
+                      ? 'No location selected'
+                      : 'Lat: ${point!.latitude.toStringAsFixed(4)}, Lng: ${point!.longitude.toStringAsFixed(4)}');
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.place_outlined),
+                    title: Text(display, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    subtitle: const Text('Pick a location on the map'),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.map_outlined),
+                          label: const Text('Pick on map'),
+                          onPressed: () async {
+                            final picked = await showLocationPickerDialog(
+                              context: ctx,
+                              title: 'Choose search location',
+                              initialCenter: point ?? const LatLng(43.6532, -79.3832),
+                              allowCancel: true,
+
+                            );
+                            if (picked == null) return;
+
+                            setModal(() {
+                              point = picked.point;
+                              label = picked.label;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: kmCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Radius (km)',
+                      border: OutlineInputBorder(),
+                      suffixText: 'km',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('clear'),
+              child: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: ()
+              {
+                final km = double.tryParse(kmCtrl.text.trim());
+
+                if (point == null)
+                {
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(content: Text('Pick a location first.')),
+                  );
+                  return;
+                }
+                if (km == null || km <= 0)
+                {
+                  ScaffoldMessenger.of(outerContext).showSnackBar(
+                    const SnackBar(content: Text('Enter a valid radius in km.')),
+                  );
+                  return;
+                }
+
+                _nearPoint = point;
+                _nearLabel = label;
+                _nearKm = km;
+
+                Navigator.of(ctx).pop('apply');
+              },
+              child: const Text('Apply'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+    if (result == null) return;
+    if (result == 'clear')
+    {
+      setState(() {
+        _nearPoint = null;
+        _nearLabel = null;
+        _nearKm = null;
+      });
+      await _load();
+      return;
+    }
+
+    setState(() {}); // already set fields above
+    await _load();
+  }
+
+  Widget _buildNearbyLoc()
+  {
+    if (_nearPoint == null || _nearKm == null) return const SizedBox.shrink();
+
+    final label = _nearLabel ?? 'Lat ${_nearPoint!.latitude.toStringAsFixed(3)}, Lng ${_nearPoint!.longitude.toStringAsFixed(3)}';
+
+    return InputChip(
+      avatar: const Icon(Icons.near_me_outlined, size: 18),
+      label: Text('Within ${_nearKm!.toStringAsFixed(0)} km • $label',
+          overflow: TextOverflow.ellipsis),
+      onPressed: _openNearbyFilter,
+      onDeleted: () async {
+        setState(() {
+          _nearPoint = null;
+          _nearLabel = null;
+          _nearKm = null;
+        });
+        await _load();
+      },
+    );
+  }
+
 }

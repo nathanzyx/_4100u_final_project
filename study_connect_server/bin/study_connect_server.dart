@@ -9,7 +9,8 @@ import 'package:study_connect_shared/models/group.dart';
 import 'package:study_connect_shared/models/session.dart';
 import 'package:study_connect_shared/models/chat_message.dart';
 
-
+// for random messages
+import 'auto_messenger.dart';
 
 void main(List<String> arguments) async {
 
@@ -20,7 +21,15 @@ void main(List<String> arguments) async {
 
   const port = 8080;
   final server = await HttpServer.bind(InternetAddress.anyIPv4, 8080);
-  print('StudyConnect server listening on http://localhost:$port');
+  print('StudyConnect server listening to http://localhost:$port');
+
+  // begin auto message sending
+  final auto = ServerAutoMessenger(
+    db,
+    tick: const Duration(seconds: 5),
+    sendChancePerTick: 0.2,
+    );
+  auto.start();
 
   await for (final request in server) 
   {
@@ -351,6 +360,17 @@ Future<void> _handleGroups
       final location = q['location'];
       final tag = q['tag'];
 
+      final nearLat = _parseDoubleParam(q, 'nearLat');
+      final nearLng = _parseDoubleParam(q, 'nearLng');
+      final withinKm = _parseDoubleParam(q, 'withinKm');
+
+      // if radius is given, but no coords were given, bad request
+      if (withinKm != null && (nearLat == null || nearLng == null))
+      {
+        _badRequest(request, 'latitude and longitude are missing!');
+        return;
+      }
+
       // time
       final beforeCreated = _parseIntParam(q, 'beforeCreated');
       final afterCreated = _parseIntParam(q, 'afterCreated');
@@ -364,9 +384,35 @@ Future<void> _handleGroups
         limit: limit,
         beforeCreated: beforeCreated,
         afterCreated: afterCreated,
+        nearLat: nearLat,
+        nearLng: nearLng,
+        withinKm: withinKm,
       );
 
-      final list = groups.map((g) => g.toMap()).toList();
+      // if a valid user made this call (and is authenticated, then we also determine whether the user is or isnt joined in reach group)
+      User? user;
+      final hasAnyAuthHeader = request.headers.value('X-User-Id') != null || request.headers.value('X-Auth-Token') != null;
+
+      if (hasAnyAuthHeader)
+      {
+        user = await _requireAuth(request, db);
+        if (user == null) return;
+      }
+
+      final joinedGroupIds = (user == null)? <int>{} : await db.getJoinedGroupIds(user.id);
+
+      // mark each group as joined or unjoined
+      final groupIds = groups.map((g) => g.id).whereType<int>().toList();
+      final memberCounts = await db.getGroupMemberCounts(groupIds);
+
+      final list = groups.map((g)
+      {
+        final isJoined = g.id != null && joinedGroupIds.contains(g.id!);
+        final members = g.id != null ? (memberCounts[g.id!] ?? 0) : 0;
+
+        return g.copyWith(joined: isJoined, numMembers: members).toMap(includeJoined: true, includeNumMembers: true);
+      }).toList();
+
       _json(request, list);
     }
     else if (method == 'POST') 
@@ -396,7 +442,11 @@ Future<void> _handleGroups
         creatorId: user.id,
         created: null,
       );
-      await db.insertGroup(group);
+      final newGroup = await db.insertGroup(group);
+
+      // auto-join the creator of the group into the group
+      await db.setJoinedGroup(user.id, newGroup.id!, true);
+
       _json(request, true, statusCode: HttpStatus.created);
     }
     else 
@@ -542,7 +592,18 @@ Future<void> _handleGroups
     if (segments.length == 3 && segments[2] == 'sessions') 
     {
       if(method == 'GET') 
-      {
+      { 
+        // if the user making this query is authenticated, we attach joined status for each session for that user
+        User? user;
+        final hasAnyAuthHeader = request.headers.value('X-User-Id') != null || request.headers.value('X-Auth-Token') != null;
+        if (hasAnyAuthHeader)
+        {
+          user = await _requireAuth(request, db);
+          if (user == null) return;
+        }
+        // get all sessions joined for the authenticated user
+        final joinedSessionIds = (user == null) ? <int>{} : await db.getJoinedSessionIdsForUserInGroup(user.id, groupId);
+
         final qp = request.uri.queryParameters;
 
         // limit
@@ -569,7 +630,13 @@ Future<void> _handleGroups
           limit: limit,
         );
 
-        final list = sessions.map((s) => s.toMap()).toList();
+        // add joined status if applicable
+        final list = sessions.map((s)
+        {
+          final isJoined = s.id != null && joinedSessionIds.contains(s.id!);
+          return s.copyWith(joined: isJoined).toMap(includeJoined: true);
+        }).toList();
+
         _json(request, list);
       }
       else if (method == 'POST') 
@@ -672,7 +739,7 @@ Future<void> _handleGroups
         (
           message.groupId,
           messageId,
-          user.id
+          message.creatorId!,
         );
 
         _json(request, {'success': 'true'});
@@ -700,7 +767,7 @@ Future<void> _handleSessions
   /*
     /session/{id}
   */
-  if(segments.length == 2) 
+  if(segments.length >= 2) 
   {
     final id = int.tryParse(segments[1]);
     if (id == null)
@@ -893,6 +960,8 @@ Future<void> _handleNotifications
       };
     }).toList();
 
+    print("MADE IT TO END OF /notifications");
+
     _json(request, list);
     return;
   }
@@ -983,8 +1052,8 @@ int _parseLimit
   }
 ) 
 {
-  final raw = queryParams['limit'];
-  final parsed = raw != null ? int.tryParse(raw) : null;
+  final i = queryParams['limit'];
+  final parsed = i != null ? int.tryParse(i) : null;
   if (parsed == null || parsed <= 0) return def;
   if (parsed > max) return max;
   return parsed;
@@ -996,8 +1065,15 @@ int? _parseIntParam
   String key
 )
 {
-  final raw = qp[key];
-  if (raw == null) return null;
-  return int.tryParse(raw);
+  final i = qp[key];
+  if (i == null) return null;
+  return int.tryParse(i);
+}
+
+double? _parseDoubleParam(Map<String, String> queryParam, String key)
+{
+  final i = queryParam[key];
+  if (i == null) return null;
+  return double.tryParse(i);
 }
 

@@ -7,12 +7,16 @@ class SessionInfo {
   final String? location;
   final DateTime? startDateTime;
   final DateTime? endDateTime;
+  final int? maxAttendees;
+  final String? description;
 
   SessionInfo({
     required this.title,
     this.location,
     this.startDateTime,
     this.endDateTime,
+    this.maxAttendees,
+    this.description,
   });
 }
 
@@ -28,15 +32,20 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
+  final _maxAttendeesCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
 
   DateTime? _pickedDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
+  int? _maxAttendees;
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     _locationCtrl.dispose();
+    _maxAttendeesCtrl.dispose();
+    _descriptionCtrl.dispose();
     super.dispose();
   }
 
@@ -107,6 +116,16 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
       end = _combine(_pickedDate!, _endTime!);
     }
 
+    final maxText = _maxAttendeesCtrl.text.trim();
+    if (maxText.isNotEmpty)
+    {
+      _maxAttendees = int.tryParse(maxText);
+    }
+    else
+    {
+      _maxAttendees = null;
+    }
+
     final info = SessionInfo(
       title: _titleCtrl.text.trim(),
       location: _locationCtrl.text.trim().isEmpty
@@ -114,6 +133,8 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
           : _locationCtrl.text.trim(),
       startDateTime: start,
       endDateTime: end,
+      maxAttendees: _maxAttendees,
+      description: _descriptionCtrl.text.trim().isEmpty ? null : _descriptionCtrl.text.trim(),
     );
 
     Navigator.of(context).pop(info);
@@ -145,11 +166,30 @@ class _CreateSessionDialogState extends State<CreateSessionDialog> {
               ),
               const SizedBox(height: 12),
 
+              TextFormField(
+                controller: _descriptionCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Description (optional)',
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+
               // Location / room
               TextFormField(
                 controller: _locationCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Location (Room)',
+                  labelText: 'Location (e.g. building, floor, room)',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+
+              // Max Atendees
+              TextFormField(
+                controller: _maxAttendeesCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Maximum Attendees',
                 ),
               ),
               const SizedBox(height: 16),

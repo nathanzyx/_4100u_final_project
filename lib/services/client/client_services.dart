@@ -462,14 +462,9 @@ class ClientService {
       headers: _authHeaders(),
     );
 
-    if (result.statusCode == 409) {
-      throw UsernameTakenException();
-    }
-    if (result.statusCode != 200) {
-      throw Exception('Failed to update account: ${result.statusCode} ${result.body}');
-    }
-
-    // Update local copy (don’t depend on server body shape)
+    if (result.statusCode == 409) throw UsernameTakenException();
+    if (result.statusCode != 200) throw Exception('Failed to update account: ${result.statusCode} ${result.body}');
+    
     currentUser = User(
       id: currentUser!.id,
       displayName: displayName ?? currentUser!.displayName,
@@ -511,6 +506,10 @@ class ClientService {
       int limit = 50,
       int? beforeCreatedMs,
       int? afterCreatedMs,
+      // for geolocation
+      double? nearLat,
+      double? nearLng,
+      double? withinKm,
     }
   ) async
   {
@@ -541,9 +540,16 @@ class ClientService {
     {
       params['afterCreated'] = afterCreatedMs.toString();
     }
+    if (nearLat != null && nearLng != null && withinKm != null && withinKm > 0)
+    {
+      params['nearLat'] = nearLat.toString();
+      params['nearLng'] = nearLng.toString();
+      params['withinKm'] = withinKm.toString();
+    }
 
     final queryString = params.entries.map((e) =>'${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
-    final result = await _api.get('/groups?$queryString');
+    final headers = (currentUser == null) ? null : _authHeadersForUser(currentUser!);
+    final result = await _api.get('/groups?$queryString', headers: headers);
     
     if (result.statusCode != 200)
     {
@@ -661,7 +667,7 @@ class ClientService {
       headers: _authHeaders()
     );
 
-    if (result.statusCode == 200 && result.statusCode == 204) 
+    if (result.statusCode == 200 || result.statusCode == 204) 
     {
       return true;
     }
@@ -732,7 +738,8 @@ class ClientService {
 
     final queryString = params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
 
-    final result = await _api.get('/groups/$groupId/sessions?$queryString');
+    final headers = (currentUser == null) ? null : _authHeadersForUser(currentUser!);
+    final result = await _api.get('/groups/$groupId/sessions?$queryString', headers: headers);
 
     if (result.statusCode != 200)
     {
@@ -988,7 +995,7 @@ class ClientService {
   void startNotificationPolling()
   {
     _notificationTimer?.cancel();
-    _lastNotificationCheckMs = DateTime.now().millisecondsSinceEpoch;
+    // _lastNotificationCheckMs = DateTime.now().millisecondsSinceEpoch;
     _notificationTimer = Timer.periodic
     (
       const Duration(seconds: 10),
@@ -1009,44 +1016,42 @@ class ClientService {
       final user = currentUser ?? await ensureUser();
 
       final params = <String, String>{};
-      if (_lastNotificationCheckMs != null) {
+      if (_lastNotificationCheckMs != null)
+      {
         params['since'] = _lastNotificationCheckMs!.toString();
       }
 
-      final queryString = params.isEmpty ? '' : '?' + params.entries.map((e) =>'${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+      final queryString = params.isEmpty ? '' : '?' + params.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
 
-      final result = await _api.get
-      (
-        '/notifications$queryString',
-        headers: _authHeadersForUser(user),
-      );
+      final result = await _api.get('/notifications$queryString',headers: _authHeadersForUser(user));
 
-      // successful
-      if (result.statusCode != 200)
-      {
-        return;
-      }
+      print('[NOTIF] status=${result.statusCode} body=${result.body}');
 
-      final List<dynamic> decoded =jsonDecode(result.body) as List<dynamic>;
-      if (decoded.isEmpty) {
-        return;
-      }
+      if (result.statusCode != 200) return;
 
-      _lastNotificationCheckMs = DateTime.now().millisecondsSinceEpoch;
+      final decoded = jsonDecode(result.body) as List<dynamic>;
+      if (decoded.isEmpty) return;
+
+      int newest = _lastNotificationCheckMs ?? 0;
 
       for (final raw in decoded)
       {
         final m = Map<String, Object?>.from(raw as Map);
 
+        final notifId = (m['id'] as int?) ?? 0;
         final groupName = (m['groupName'] as String?) ?? 'New message';
         final text = (m['messageText'] as String?) ?? '';
 
-        // finally, send notification
-        await NotificationService.instance.showMessageNotification(groupName, text);
+        await NotificationService.instance.showMessageNotification(groupName,text);
       }
-    } catch (e)
+
+      _lastNotificationCheckMs = newest + 1;
+
+      
+    }
+    catch (e, st)
     {
-      throw Exception("Notification service error.");
+      print('[NOTIF] ERRORS=$e\n$st');
     }
   }
 
