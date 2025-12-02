@@ -67,25 +67,37 @@ Each group member constributed the following
 ### **Zayam Khan - Contributions**
 
 **Created**
+
 - **Frontend**
     - **Pages** (`lib/pages/`)
         - `chat_page.dart` (*created chatting page*)
-        - `group_details_page.dart` (*created group page*)
-        - `home_page.dart` (*created home page*)
+        - `group_details_page.dart` (*created group details screen*)
+        - `home_page.dart` (*created main home screen*)
+        - `settings_page.dart` (*added settings UI: dark mode + notification toggle*)
     - **Widgets** (`lib/widgets/`)
-        - `create_group.dart` (*created group creation UI*)
-        - `create_session.dart` (*created session creation UI*)
+        - `create_group.dart` (*built group creation dialog*)
+        - `create_session.dart` (*built session creation dialog with date & time pickers*)
         - `edit.dart` (*created*)
+        - `group_joined_extension.dart` (*added helper for group membership state*)
     - **Services**
-        - `tips.dart` (*created*)
+        - `tips.dart` (*created “Study Tip of the Day” service*)
+        - **Updated**: `notification_service.dart` (*added toggle handling for on/off notifications*)
+        - **Updated**: `client_services.dart`  
+          - implemented session saving & loading  
+          - added message handling improvements  
+          - fixed notification auto-enable behavior  
+
 - **Backend**
     - **Server** (`study_connect_server/`)
-        - `database.dart` (*implemented initial database and methods*)
-- **Data Classes** (`study_connect_shared/lib/models/`)
-    - `chat_message.dart` (*created message data model*)
-    - `group.dart` (*created group data model*)
-    - `session.dart` (*created session data model*)
+        - `database.dart` (*initial DB + CRUD methods for groups, sessions, and messages*)
+        - **Updated server handlers** (*fixed session saving, added session date & time fields*)
 
+- **Data Classes** (`study_connect_shared/lib/models/`)
+    - `chat_message.dart` (*message model*)
+    - `group.dart` (*group model*)
+    - `session.dart`  
+        - (*created session model*)  
+        - **Added fields:** `date`, `startTime`, `endTime`, `location
 
 ### **Ryan Hastings - Contributions**
 
@@ -135,3 +147,4 @@ Each group member constributed the following
 - **Widgets** (`lib/widgets/`)
     - `create_session.dart` (*integration updates with session list*)
     - `create_group.dart` (*minor consistency fixes*)
+
