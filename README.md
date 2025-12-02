@@ -23,6 +23,50 @@ Project By:
     .\run_project.ps1
     `
 
+# Project Notes
+
+### Multiple Pages
+
+- Settings Page
+- Home Page (*With groups list and search*)
+- Groups Pages (*With sessions and group info*)
+
+### Dialogs and Pickers
+
+- Date & Time Selector in Session Creation Widget
+
+### Notifications
+
+- Notifications sent to the members of a group when a chat message is sent
+
+### Snackbars
+
+- Confirmations for Group and Session creation/deletion
+- Notices of errors (e.g. missing required fields)
+
+### Storage
+
+- On device local storage of user data
+- On device local storage of dark mode setting
+
+### HTTP Requests
+
+- HTTP communication between client and server for operations involving groups, sessions, login, notifications, account modifications, sending messages, etc.
+
+## Optional Functional Requirements
+
+### Maps
+
+- Map widgets for geolocating users using latitude and longitude
+
+### Geolocation
+
+- user and group coordinates used to search for nearby groups
+
+### Internationalization
+
+- Groups can be created internationally
+
 # Contributions
 
 Each group member constributed the following
@@ -147,4 +191,5 @@ Each group member constributed the following
 - **Widgets** (`lib/widgets/`)
     - `create_session.dart` (*integration updates with session list*)
     - `create_group.dart` (*minor consistency fixes*)
+
 
