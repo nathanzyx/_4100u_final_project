@@ -1025,7 +1025,7 @@ class ClientService {
 
       final result = await _api.get('/notifications$queryString',headers: _authHeadersForUser(user));
 
-      print('[NOTIF] status=${result.statusCode} body=${result.body}');
+      // print('[NOTIF] status=${result.statusCode} body=${result.body}');
 
       if (result.statusCode != 200) return;
 
@@ -1051,7 +1051,7 @@ class ClientService {
     }
     catch (e, st)
     {
-      print('[NOTIF] ERRORS=$e\n$st');
+      // print('[NOTIF] ERRORS=$e\n$st');
     }
   }
 
