@@ -88,12 +88,34 @@ Each group member constributed the following
 
 ### **Ryan Hastings - Contributions**
 
-**Modified**
+**Created**
+- **Frontend**
+    - **Location Picker** (`lib/widgets/`)
+        - `location_picker.dart` (*created full location picker dialog incorporating the flutter_map and latlong2 libraries with OpenStreetMap*)
 - **Backend**
-    - **Server** (`study_connect_server/`) (*minor fixes*)
+    - **Address Converter** (`lib/services/`)
+        - `address_convert.dart` (*created service to convert a full address to coordinates using Nominatim (no longer used in current version)*)
+
+**Modified**
+- **Frontend**
+    - **Home Page** (`lib/pages/`)
+        - `home_page.dart` (*added method to calculate the distance between two pairs of coordinates, and used that to sort group list by distance from user (no longer exists in current version)*)
+    - **Group Create/Edit** (`lib/widgets`)
+        - `create_group.dart` (*split location field into four separate fields (address, city, state, country) and consolidated them into one location string on save (no longer exists in current version). Was intended to be used with address converter*)
+        - `edit.dart` (*split location field into four separate fields (address, city, state, country) and consolidated them into one location string on save (no longer exists in current version). Was intended to be used with address converter*)
+- **Backend**
+    - **Client Services** (`lib/services/`) (*updates*)
+        - `client_services.dart` (*added user coordinate support*)
+    - **Server** (`study_connect_server/`) (*minor fixes and updates*)
         - `database.dart` (*bug fix*)
+        - `database.dart` (*added coordinate columnns to relevant tables and updated related database methods accordingly*)
+        - `study_connect_server.dart` (*added backend integration to location picker, user coordinates, and group coordinates*)
+    - **Models** (`study_connect_shared/`) (*updates*)
+        - `user.dart` (*added coordinate attributes and updated related methods accordingly*)
+        - `group.dart` (*added coordinate attributes and updated related methods accordingly*)
 
 ### **Myron Lobo - Contributions**
+
 **Created**
 - **Frontend**
     - **Membership System** (`lib/pages/`)
