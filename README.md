@@ -86,6 +86,7 @@ Each group member constributed the following
     - `group.dart` (*created group data model*)
     - `session.dart` (*created session data model*)
 
+
 ### **Ryan Hastings - Contributions**
 
 **Created**
@@ -113,6 +114,7 @@ Each group member constributed the following
     - **Models** (`study_connect_shared/`) (*updates*)
         - `user.dart` (*added coordinate attributes and updated related methods accordingly*)
         - `group.dart` (*added coordinate attributes and updated related methods accordingly*)
+
 
 ### **Myron Lobo - Contributions**
 
