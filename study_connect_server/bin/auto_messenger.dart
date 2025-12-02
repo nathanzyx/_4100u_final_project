@@ -82,7 +82,7 @@ class ServerAutoMessenger {
       // notify group members (reuses your existing pipeline)
       await db.insertNotificationsForNewMessage(groupId, messageId, systemUserId);
 
-      print('[AUTO] Sent message to "$groupName" (groupId=$groupId)');
+      // print('[AUTO] Sent message to "$groupName" (groupId=$groupId)');
     } catch (e) {
       int a = 1;
     } finally {

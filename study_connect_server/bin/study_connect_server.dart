@@ -960,7 +960,7 @@ Future<void> _handleNotifications
       };
     }).toList();
 
-    print("MADE IT TO END OF /notifications");
+    // print("MADE IT TO END OF /notifications");
 
     _json(request, list);
     return;
